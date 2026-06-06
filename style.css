@@ -101,8 +101,13 @@ body {
   gap: 10px;
 }
 
-.logo-emoji {
-  font-size: 26px;
+.header-logo-img {
+  width: 30px;
+  height: 30px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1px solid var(--accent-gold);
+  box-shadow: 0 0 8px rgba(244, 211, 94, 0.4);
   animation: float 3s ease-in-out infinite;
 }
 
@@ -176,6 +181,10 @@ body {
   font-size: 24px;
   margin-bottom: 5px;
   filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.5));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
 }
 
 .podium-name {
@@ -234,6 +243,28 @@ body {
 }
 .gold .avatar-badge {
   font-size: 30px;
+  height: 42px;
+}
+
+.gold-trophy-img {
+  width: 38px;
+  height: 38px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-gold);
+  filter: drop-shadow(0 0 6px rgba(244, 211, 94, 0.6));
+  animation: trophy-pulse 2.5s infinite ease-in-out;
+}
+
+@keyframes trophy-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(244, 211, 94, 0.5));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 12px rgba(244, 211, 94, 0.8));
+  }
 }
 
 .silver .podium-bar {
@@ -820,14 +851,32 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+}
+
+.team-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.team-local-info {
+  justify-content: flex-end;
+}
+
+.team-visit-info {
+  justify-content: flex-start;
 }
 
 .match-team {
-  flex: 1;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .match-team.team-local {
@@ -836,6 +885,16 @@ body {
 
 .match-team.team-visit {
   text-align: left;
+}
+
+.match-flag {
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
 }
 
 .match-score-pill {

@@ -12,7 +12,6 @@ const STATE = {
 const DOM = {
   btnSettings: document.getElementById('btn-settings'),
   btnRefresh: document.getElementById('btn-refresh'),
-  btnFloatingRefresh: document.getElementById('btn-floating-refresh'),
   refreshIcon: document.getElementById('refresh-icon'),
   
   // Tabs & Views
@@ -58,9 +57,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // 3. Setup event listeners
   setupEventListeners();
   
-  // 4. Fetch initial data
+  // 4. Fetch initial data (only if cooldown has expired or no cache exists)
   if (STATE.driveId) {
-    fetchStandings();
+    if (checkRefreshCooldown(false)) {
+      fetchStandings();
+    }
   } else {
     renderEmptyState(true); // First run, no Drive ID configured
   }
@@ -128,6 +129,30 @@ function saveSettings(idOrUrl) {
   
   closeModal();
   fetchStandings();
+}
+
+const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+function checkRefreshCooldown(isManual = false) {
+  const cachedData = localStorage.getItem('kikes_cached_standings');
+  if (!cachedData) return true; // No cache, force fetch
+  
+  const cachedTimeStr = localStorage.getItem('kikes_cached_time');
+  if (!cachedTimeStr) return true;
+  
+  const lastTime = new Date(cachedTimeStr);
+  const now = new Date();
+  const elapsed = now.getTime() - lastTime.getTime();
+  
+  if (elapsed < COOLDOWN_MS) {
+    if (isManual) {
+      const remainingMs = COOLDOWN_MS - elapsed;
+      const remainingMin = Math.ceil(remainingMs / (60 * 1000));
+      alert(`Los datos se actualizaron recientemente.\nPara proteger el límite de cuota de Google Drive, puedes volver a solicitar datos en ${remainingMin} minuto(s).`);
+    }
+    return false;
+  }
+  return true;
 }
 
 // --- Fetch & Parse Data ---
@@ -371,11 +396,9 @@ function setLoadingState(loading) {
   STATE.isRefreshing = loading;
   if (loading) {
     DOM.refreshIcon.classList.add('fa-spin');
-    DOM.btnFloatingRefresh.querySelector('i').classList.add('fa-spin');
     DOM.ptrFeedback.classList.add('show');
   } else {
     DOM.refreshIcon.classList.remove('fa-spin');
-    DOM.btnFloatingRefresh.querySelector('i').classList.remove('fa-spin');
     DOM.ptrFeedback.classList.remove('show');
   }
 }
@@ -401,8 +424,11 @@ function setupEventListeners() {
     saveSettings(DOM.inputDriveId.value);
   });
   
-  DOM.btnRefresh.addEventListener('click', fetchStandings);
-  DOM.btnFloatingRefresh.addEventListener('click', fetchStandings);
+  DOM.btnRefresh.addEventListener('click', () => {
+    if (checkRefreshCooldown(true)) {
+      fetchStandings();
+    }
+  });
   
   // Search filter
   DOM.searchInput.addEventListener('input', (e) => {
@@ -438,7 +464,9 @@ function setupEventListeners() {
       touchMove = e.touches[0].clientY;
       const pullDist = touchMove - touchStart;
       if (pullDist > 70 && !STATE.isRefreshing) {
-        fetchStandings();
+        if (checkRefreshCooldown(true)) {
+          fetchStandings();
+        }
         touchStart = 0; // Prevent duplicate triggers
       }
     }
@@ -488,9 +516,15 @@ function renderMatches(playedMatches) {
     cardEl.innerHTML = `
       <div class="match-card-header">${match.stage}</div>
       <div class="match-card-teams">
-        <span class="match-team team-local">${local}</span>
+        <div class="team-info team-local-info">
+          <span class="match-team team-local">${local}</span>
+          <img src="${getFlagUrl(local)}" class="match-flag flag-local" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
+        </div>
         <span class="match-score-pill">${match.result}</span>
-        <span class="match-team team-visit">${visit}</span>
+        <div class="team-info team-visit-info">
+          <img src="${getFlagUrl(visit)}" class="match-flag flag-visit" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
+          <span class="match-team team-visit">${visit}</span>
+        </div>
       </div>
       <button class="match-toggle-btn" data-match-id="${match.id}">
         <i class="fa-solid fa-chevron-down"></i> Ver Pronósticos Top 10
@@ -549,6 +583,22 @@ function renderMatches(playedMatches) {
       }
     });
   });
+}
+
+// --- Flag Resolver Helper ---
+function getFlagUrl(teamName) {
+  if (!teamName) return 'Assets/Flags/placeholder.png';
+  
+  // Normalize team name: lowercase, replace spaces with underscores, remove accents
+  let normalized = teamName.toLowerCase().trim();
+  normalized = normalized.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  normalized = normalized.replace(/\s+/g, '_');
+  
+  // Custom mappings for specific flag files
+  if (normalized === 'usa' || normalized === 'estados_unidos') normalized = 'estados_unidos';
+  if (normalized === 'republica_checa') normalized = 'republica_checa';
+  
+  return `Assets/Flags/${normalized}.png`;
 }
 
 // --- Service Worker Registration ---
