@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>KIKES MUNDIAL 2026</title>
+  
+  <!-- Manifest & Icon -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="app_icon.png">
+  <link rel="icon" type="image/png" href="app_icon.png">
+  
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  
+  <!-- Refresh & Pull-to-refresh feedback -->
+  <div id="ptr-feedback" class="ptr-feedback">
+    <i class="fa-solid fa-arrows-rotate fa-spin"></i> Actualizando...
+  </div>
+
+  <div class="app-container">
+    
+    <!-- Header -->
+    <header class="app-header">
+      <button id="btn-settings" class="header-btn" aria-label="Configurar Google Drive">
+        <i class="fa-solid fa-gear"></i>
+      </button>
+      <div class="header-brand">
+        <span class="logo-emoji">🏆</span>
+        <div class="brand-text">
+          <h1>KIKES MUNDIAL</h1>
+          <p>POLLA MUNDIALISTA 2026</p>
+        </div>
+      </div>
+      <button id="btn-refresh" class="header-btn" aria-label="Actualizar datos">
+        <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+      </button>
+    </header>
+
+    <!-- Main Scrollable Content -->
+    <main class="app-content">
+      
+      <!-- Visual Podium (Top 3) -->
+      <section class="podium-section">
+        <h2 class="section-title">PODIO LÍDERES</h2>
+        <div class="podium-wrapper">
+          
+          <!-- 2nd Place -->
+          <div class="podium-pod silver" id="podium-2">
+            <div class="avatar-badge">🥈</div>
+            <div class="podium-name" id="txt-silver-name">-</div>
+            <div class="podium-points" id="txt-silver-points">0 pts</div>
+            <div class="podium-bar">
+              <span class="rank-num">2°</span>
+            </div>
+          </div>
+          
+          <!-- 1st Place -->
+          <div class="podium-pod gold" id="podium-1">
+            <div class="avatar-badge">👑</div>
+            <div class="podium-name" id="txt-gold-name">-</div>
+            <div class="podium-points" id="txt-gold-points">0 pts</div>
+            <div class="podium-bar">
+              <span class="rank-num">1°</span>
+            </div>
+          </div>
+          
+          <!-- 3rd Place -->
+          <div class="podium-pod bronze" id="podium-3">
+            <div class="avatar-badge">🥉</div>
+            <div class="podium-name" id="txt-bronze-name">-</div>
+            <div class="podium-points" id="txt-bronze-points">0 pts</div>
+            <div class="podium-bar">
+              <span class="rank-num">3°</span>
+            </div>
+          </div>
+          
+        </div>
+      </section>
+
+      <!-- Search & Filters -->
+      <section class="search-section">
+        <div class="search-bar">
+          <i class="fa-solid fa-magnifying-glass search-icon"></i>
+          <input type="text" id="search-input" placeholder="Buscar participante...">
+          <button id="clear-search" class="clear-search-btnhidden">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </section>
+
+      <!-- Leaderboard List / Table -->
+      <section class="leaderboard-section">
+        <div class="leaderboard-card">
+          <div class="table-header">
+            <div class="col-rank">Puesto</div>
+            <div class="col-name">Participante</div>
+            <div class="col-details">Part./Com.</div>
+            <div class="col-total">Total</div>
+          </div>
+          <div id="leaderboard-list" class="leaderboard-list">
+            <!-- Loaded dynamically in JS -->
+            <div class="loading-state">
+              <i class="fa-solid fa-circle-notch fa-spin"></i>
+              <p>Cargando posiciones...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Last Update info -->
+      <div class="update-info">
+        <p id="txt-last-update">Última actualización: Desconocida</p>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- Settings Modal (Google Drive URL setup) -->
+  <div id="modal-settings" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-cloud-arrow-down"></i> Sincronizar Google Drive</h3>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-info">Ingresa el ID del archivo de Google Drive generado por la app Kikes Mundial (o el enlace para compartir completo).</p>
+        
+        <div class="form-group">
+          <label for="input-drive-id">ID del Archivo de Drive o Enlace Completo:</label>
+          <input type="text" id="input-drive-id" placeholder="Ej: 1A2B3C4D5E6F7G8H...">
+        </div>
+        
+        <div class="instructions">
+          <h4>¿Cómo obtener el enlace?</h4>
+          <ol>
+            <li>Exporta el archivo de posiciones desde la app WPF.</li>
+            <li>En Drive web, haz clic derecho sobre el archivo -> <b>Compartir</b> -> <b>Obtener enlace</b>.</li>
+            <li>Cambia el acceso a <b>"Cualquier persona con el enlace puede ver"</b>.</li>
+            <li>Copia el enlace y pégalo aquí. Extraeremos el ID automáticamente.</li>
+          </ol>
+        </div>
+        
+        <button id="btn-save-settings" class="btn-primary">Guardar y Sincronizar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Refresh Button -->
+  <button id="btn-floating-refresh" class="btn-floating" aria-label="Actualizar posiciones">
+    <i class="fa-solid fa-arrows-rotate"></i>
+  </button>
+
+  <script src="app.js"></script>
+</body>
+</html>
