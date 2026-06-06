@@ -51,73 +51,90 @@
     <!-- Main Scrollable Content -->
     <main class="app-content">
       
-      <!-- Visual Podium (Top 3) -->
-      <section class="podium-section">
-        <h2 class="section-title">PODIO LÍDERES</h2>
-        <div class="podium-wrapper">
-          
-          <!-- 2nd Place -->
-          <div class="podium-pod silver" id="podium-2">
-            <div class="avatar-badge">🥈</div>
-            <div class="podium-name" id="txt-silver-name">-</div>
-            <div class="podium-points" id="txt-silver-points">0 pts</div>
-            <div class="podium-bar">
-              <span class="rank-num">2°</span>
+      <!-- Panel Posiciones (Activo) -->
+      <div id="view-posiciones" class="view-panel">
+        <!-- Visual Podium (Top 3) -->
+        <section class="podium-section">
+          <h2 class="section-title">PODIO LÍDERES</h2>
+          <div class="podium-wrapper">
+            
+            <!-- 2nd Place -->
+            <div class="podium-pod silver" id="podium-2">
+              <div class="avatar-badge">🥈</div>
+              <div class="podium-name" id="txt-silver-name">-</div>
+              <div class="podium-points" id="txt-silver-points">0 pts</div>
+              <div class="podium-bar">
+                <span class="rank-num">2°</span>
+              </div>
             </div>
-          </div>
-          
-          <!-- 1st Place -->
-          <div class="podium-pod gold" id="podium-1">
-            <div class="avatar-badge">👑</div>
-            <div class="podium-name" id="txt-gold-name">-</div>
-            <div class="podium-points" id="txt-gold-points">0 pts</div>
-            <div class="podium-bar">
-              <span class="rank-num">1°</span>
+            
+            <!-- 1st Place -->
+            <div class="podium-pod gold" id="podium-1">
+              <div class="avatar-badge">👑</div>
+              <div class="podium-name" id="txt-gold-name">-</div>
+              <div class="podium-points" id="txt-gold-points">0 pts</div>
+              <div class="podium-bar">
+                <span class="rank-num">1°</span>
+              </div>
             </div>
-          </div>
-          
-          <!-- 3rd Place -->
-          <div class="podium-pod bronze" id="podium-3">
-            <div class="avatar-badge">🥉</div>
-            <div class="podium-name" id="txt-bronze-name">-</div>
-            <div class="podium-points" id="txt-bronze-points">0 pts</div>
-            <div class="podium-bar">
-              <span class="rank-num">3°</span>
+            
+            <!-- 3rd Place -->
+            <div class="podium-pod bronze" id="podium-3">
+              <div class="avatar-badge">🥉</div>
+              <div class="podium-name" id="txt-bronze-name">-</div>
+              <div class="podium-points" id="txt-bronze-points">0 pts</div>
+              <div class="podium-bar">
+                <span class="rank-num">3°</span>
+              </div>
             </div>
+            
           </div>
-          
-        </div>
-      </section>
+        </section>
 
-      <!-- Search & Filters -->
-      <section class="search-section">
-        <div class="search-bar">
-          <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="text" id="search-input" placeholder="Buscar participante...">
-          <button id="clear-search" class="clear-search-btnhidden">
-            <i class="fa-solid fa-xmark"></i>
-          </button>
-        </div>
-      </section>
-
-      <!-- Leaderboard List / Table -->
-      <section class="leaderboard-section">
-        <div class="leaderboard-card">
-          <div class="table-header">
-            <div class="col-rank">Puesto</div>
-            <div class="col-name">Participante</div>
-            <div class="col-details">Part./Com.</div>
-            <div class="col-total">Total</div>
+        <!-- Search & Filters -->
+        <section class="search-section">
+          <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="search-input" placeholder="Buscar participante...">
+            <button id="clear-search" class="clear-search-btn">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
           </div>
-          <div id="leaderboard-list" class="leaderboard-list">
+        </section>
+
+        <!-- Leaderboard List / Table -->
+        <section class="leaderboard-section">
+          <div class="leaderboard-card">
+            <div class="table-header">
+              <div class="col-rank">Puesto</div>
+              <div class="col-name">Participante</div>
+              <div class="col-details">Part./Com.</div>
+              <div class="col-total">Total</div>
+            </div>
+            <div id="leaderboard-list" class="leaderboard-list">
+              <!-- Loaded dynamically in JS -->
+              <div class="loading-state">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <p>Cargando posiciones...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Panel Partidos (Oculto) -->
+      <div id="view-partidos" class="view-panel hidden">
+        <section class="matches-section">
+          <h2 class="section-title">PARTIDOS JUGADOS</h2>
+          <div id="matches-list" class="matches-list">
             <!-- Loaded dynamically in JS -->
             <div class="loading-state">
               <i class="fa-solid fa-circle-notch fa-spin"></i>
-              <p>Cargando posiciones...</p>
+              <p>Cargando partidos...</p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <!-- Last Update info -->
       <div class="update-info">
@@ -125,6 +142,18 @@
       </div>
 
     </main>
+
+    <!-- Bottom Navigation Tab Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-tab active" id="tab-posiciones">
+        <i class="fa-solid fa-chart-simple"></i>
+        <span>Posiciones</span>
+      </button>
+      <button class="nav-tab" id="tab-partidos">
+        <i class="fa-solid fa-circle-play"></i>
+        <span>Partidos</span>
+      </button>
+    </nav>
 
   </div>
 

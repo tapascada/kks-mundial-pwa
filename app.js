@@ -3,6 +3,7 @@ const DEFAULT_DRIVE_ID = '1S6HbVBKvv3iTT6bnA6UiQDsNdPfXTNVt';
 const STATE = {
   driveId: DEFAULT_DRIVE_ID,
   standings: [],
+  playedMatches: [],
   lastUpdate: null,
   isRefreshing: false
 };
@@ -13,6 +14,13 @@ const DOM = {
   btnRefresh: document.getElementById('btn-refresh'),
   btnFloatingRefresh: document.getElementById('btn-floating-refresh'),
   refreshIcon: document.getElementById('refresh-icon'),
+  
+  // Tabs & Views
+  tabPosiciones: document.getElementById('tab-posiciones'),
+  tabPartidos: document.getElementById('tab-partidos'),
+  viewPosiciones: document.getElementById('view-posiciones'),
+  viewPartidos: document.getElementById('view-partidos'),
+  matchesList: document.getElementById('matches-list'),
   
   // Podium
   goldName: document.getElementById('txt-gold-name'),
@@ -68,6 +76,7 @@ function loadSettings() {
   }
   DOM.inputDriveId.value = STATE.driveId;
   
+  // Load cache for positions
   const cachedData = localStorage.getItem('kikes_cached_standings');
   const cachedTime = localStorage.getItem('kikes_cached_time');
   if (cachedData && cachedTime) {
@@ -77,6 +86,17 @@ function loadSettings() {
       renderUI(STATE.standings);
     } catch (e) {
       console.error('Error parsing cached data', e);
+    }
+  }
+  
+  // Load cache for played matches
+  const cachedMatches = localStorage.getItem('kikes_cached_matches');
+  if (cachedMatches) {
+    try {
+      STATE.playedMatches = JSON.parse(cachedMatches);
+      renderMatches(STATE.playedMatches);
+    } catch (e) {
+      console.error('Error parsing cached matches', e);
     }
   }
 }
@@ -115,14 +135,9 @@ async function fetchStandings() {
   if (STATE.isRefreshing) return;
   setLoadingState(true);
   
-  // Try two methods to bypass CORS and load Excel sheets:
-  // Method 1: Google Sheet export endpoint directly (fast, no CORS for public files)
-  // Method 2: Public CORS Proxy fetching the direct download link (if uploaded as raw .xlsx)
   const fileId = STATE.driveId;
   const method1Url = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
   const method2Url = `https://corsproxy.io/?${encodeURIComponent(`https://drive.google.com/uc?export=download&id=${fileId}`)}`;
-  
-  let success = false;
   
   // Try Method 1
   try {
@@ -131,7 +146,6 @@ async function fetchStandings() {
     if (!response.ok) throw new Error('Method 1 download failed');
     const data = await response.arrayBuffer();
     parseExcel(data);
-    success = true;
   } catch (err) {
     console.warn('Method 1 failed, falling back to CORS proxy (Method 2)...', err);
     
@@ -141,7 +155,6 @@ async function fetchStandings() {
       if (!response.ok) throw new Error('Method 2 download failed');
       const data = await response.arrayBuffer();
       parseExcel(data);
-      success = true;
     } catch (err2) {
       console.error('All download methods failed.', err2);
       renderErrorState('No se pudo descargar el archivo de Google Drive. Verifica que el archivo sea público ("Cualquier persona con el enlace puede ver").');
@@ -160,21 +173,12 @@ function parseExcel(arrayBuffer) {
       throw new Error('El archivo Excel no tiene hojas.');
     }
     
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
+    // 1. Parse Worksheet "Posiciones" (Sheet 0)
+    const sheetPosicionesName = workbook.SheetNames[0];
+    const wsPosiciones = workbook.Sheets[sheetPosicionesName];
+    const rowsPosiciones = XLSX.utils.sheet_to_json(wsPosiciones, { defval: "" });
     
-    // Convert sheet to JSON rows
-    const rows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
-    console.log('Parsed Excel rows:', rows);
-    
-    if (rows.length === 0) {
-      throw new Error('La hoja está vacía.');
-    }
-    
-    // Validate required headers
-    // Standard keys: "Puesto", "Nombre", "Puntos Partidos", "Puntos Comodín", "Puntos Totales"
-    // Also support case-insensitive check
-    const mappedStandings = rows.map(r => {
+    const mappedStandings = rowsPosiciones.map(r => {
       return {
         rank: parseInt(r['Puesto'] || r['puesto'] || 0),
         name: String(r['Nombre'] || r['nombre'] || 'Participante Anónimo'),
@@ -184,10 +188,8 @@ function parseExcel(arrayBuffer) {
       };
     });
     
-    // Sort just in case
     mappedStandings.sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
     
-    // Refresh rank numbers in case they are missing
     let currentRank = 1;
     for (let i = 0; i < mappedStandings.length; i++) {
       if (i > 0 && mappedStandings[i].totalPoints < mappedStandings[i - 1].totalPoints) {
@@ -197,13 +199,51 @@ function parseExcel(arrayBuffer) {
     }
     
     STATE.standings = mappedStandings;
+    
+    // 2. Parse Worksheet "Partidos" (Sheet 1) if it exists
+    if (workbook.SheetNames.length > 1) {
+      const sheetPartidosName = workbook.SheetNames[1];
+      const wsPartidos = workbook.Sheets[sheetPartidosName];
+      const rowsPartidos = XLSX.utils.sheet_to_json(wsPartidos, { defval: "" });
+      
+      const matchesMap = {};
+      rowsPartidos.forEach(r => {
+        const matchId = parseInt(r['MatchId'] || r['matchId'] || 0);
+        if (!matchId) return;
+        
+        if (!matchesMap[matchId]) {
+          matchesMap[matchId] = {
+            id: matchId,
+            stage: String(r['Fase'] || r['fase'] || ''),
+            teams: String(r['Equipos'] || r['equipos'] || ''),
+            result: String(r['Resultado'] || r['resultado'] || ''),
+            predictions: []
+          };
+        }
+        
+        matchesMap[matchId].predictions.push({
+          rank: parseInt(r['Puesto'] || r['puesto'] || 0),
+          name: String(r['Nombre'] || r['nombre'] || 'Participante'),
+          prediction: String(r['Pronostico'] || r['pronostico'] || ''),
+          points: parseInt(r['Puntos'] || r['puntos'] || 0)
+        });
+      });
+      
+      // Sort matches descending (newest first)
+      STATE.playedMatches = Object.values(matchesMap).sort((a, b) => b.id - a.id);
+      localStorage.setItem('kikes_cached_matches', JSON.stringify(STATE.playedMatches));
+    } else {
+      STATE.playedMatches = [];
+      localStorage.removeItem('kikes_cached_matches');
+    }
+    
     STATE.lastUpdate = new Date();
     
-    // Save to cache
     localStorage.setItem('kikes_cached_standings', JSON.stringify(mappedStandings));
     localStorage.setItem('kikes_cached_time', STATE.lastUpdate.toISOString());
     
     renderUI(mappedStandings);
+    renderMatches(STATE.playedMatches);
   } catch (ex) {
     console.error('Error parsing Excel file', ex);
     renderErrorState('El archivo de Google Drive no tiene el formato correcto de Kikes Mundial.');
@@ -212,13 +252,9 @@ function parseExcel(arrayBuffer) {
 
 // --- UI Rendering ---
 function renderUI(standings) {
-  // 1. Render Podium
   renderPodium(standings);
-  
-  // 2. Render List
   renderList(standings);
   
-  // 3. Render update timestamp
   if (STATE.lastUpdate) {
     const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' };
     DOM.txtLastUpdate.innerText = `Última actualización: ${STATE.lastUpdate.toLocaleString('es-ES', options)}`;
@@ -226,7 +262,6 @@ function renderUI(standings) {
 }
 
 function renderPodium(standings) {
-  // Reset
   DOM.goldName.innerText = '-';
   DOM.goldPoints.innerText = '0 pts';
   DOM.silverName.innerText = '-';
@@ -234,22 +269,19 @@ function renderPodium(standings) {
   DOM.bronzeName.innerText = '-';
   DOM.bronzePoints.innerText = '0 pts';
   
-  // 1st Place (Gold)
   const first = standings.find(s => s.rank === 1);
   if (first) {
     DOM.goldName.innerText = first.name;
     DOM.goldPoints.innerText = `${first.totalPoints} pts`;
   }
   
-  // 2nd Place (Silver)
-  const second = standings.find(s => s.rank === 2) || standings[1]; // Fallback if no exact rank 2 due to ties
+  const second = standings.find(s => s.rank === 2) || standings[1];
   if (second && second !== first) {
     DOM.silverName.innerText = second.name;
     DOM.silverPoints.innerText = `${second.totalPoints} pts`;
   }
   
-  // 3rd Place (Bronze)
-  const third = standings.find(s => s.rank === 3) || standings[2]; // Fallback
+  const third = standings.find(s => s.rank === 3) || standings[2];
   if (third && third !== first && third !== second) {
     DOM.bronzeName.innerText = third.name;
     DOM.bronzePoints.innerText = `${third.totalPoints} pts`;
@@ -411,6 +443,112 @@ function setupEventListeners() {
       }
     }
   }, { passive: true });
+
+  // Tab Switching
+  DOM.tabPosiciones.addEventListener('click', () => {
+    DOM.tabPosiciones.classList.add('active');
+    DOM.tabPartidos.classList.remove('active');
+    DOM.viewPosiciones.classList.remove('hidden');
+    DOM.viewPartidos.classList.add('hidden');
+  });
+  
+  DOM.tabPartidos.addEventListener('click', () => {
+    DOM.tabPartidos.classList.add('active');
+    DOM.tabPosiciones.classList.remove('active');
+    DOM.viewPartidos.classList.remove('hidden');
+    DOM.viewPosiciones.classList.add('hidden');
+  });
+}
+
+// --- Render Played Matches Tab ---
+function renderMatches(playedMatches) {
+  DOM.matchesList.innerHTML = '';
+  
+  if (!playedMatches || playedMatches.length === 0) {
+    const emptyEl = document.createElement('div');
+    emptyEl.className = 'empty-state';
+    emptyEl.innerHTML = `
+      <i class="fa-solid fa-circle-play"></i>
+      <h3>Sin Partidos</h3>
+      <p>No hay partidos finalizados con resultados cargados todavía.</p>
+    `;
+    DOM.matchesList.appendChild(emptyEl);
+    return;
+  }
+  
+  playedMatches.forEach(match => {
+    const cardEl = document.createElement('div');
+    cardEl.className = 'match-card';
+    
+    // Split Teams (e.g. "México vs Sudáfrica")
+    const teams = match.teams.split(' vs ');
+    const local = teams[0] || 'Local';
+    const visit = teams[1] || 'Visitante';
+    
+    cardEl.innerHTML = `
+      <div class="match-card-header">${match.stage}</div>
+      <div class="match-card-teams">
+        <span class="match-team team-local">${local}</span>
+        <span class="match-score-pill">${match.result}</span>
+        <span class="match-team team-visit">${visit}</span>
+      </div>
+      <button class="match-toggle-btn" data-match-id="${match.id}">
+        <i class="fa-solid fa-chevron-down"></i> Ver Pronósticos Top 10
+      </button>
+      <div class="top10-predictions-panel" id="panel-predictions-${match.id}">
+        <table class="predictions-table">
+          <thead>
+            <tr>
+              <th>Pos</th>
+              <th>Nombre</th>
+              <th>Pronóstico</th>
+              <th>Puntos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${match.predictions.map(p => {
+              let badgeClass = 'zero';
+              if (p.points === 5) badgeClass = 'exact';
+              else if (p.points === 2) badgeClass = 'outcome';
+              
+              return `
+                <tr>
+                  <td class="pred-cell-rank">${p.rank}°</td>
+                  <td class="pred-cell-name">${p.name}</td>
+                  <td class="pred-cell-val">${p.prediction}</td>
+                  <td class="pred-cell-pts">
+                    <span class="pred-pts-badge ${badgeClass}">${p.points} pts</span>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    
+    DOM.matchesList.appendChild(cardEl);
+  });
+  
+  // Setup expand/collapse handlers
+  const toggles = DOM.matchesList.querySelectorAll('.match-toggle-btn');
+  toggles.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const matchId = btn.getAttribute('data-match-id');
+      const panel = document.getElementById(`panel-predictions-${matchId}`);
+      const isExpanded = panel.classList.contains('show');
+      
+      if (isExpanded) {
+        panel.classList.remove('show');
+        btn.classList.remove('expanded');
+        btn.innerHTML = `<i class="fa-solid fa-chevron-down"></i> Ver Pronósticos Top 10`;
+      } else {
+        panel.classList.add('show');
+        btn.classList.add('expanded');
+        btn.innerHTML = `<i class="fa-solid fa-chevron-up"></i> Ocultar Pronósticos`;
+      }
+    });
+  });
 }
 
 // --- Service Worker Registration ---
