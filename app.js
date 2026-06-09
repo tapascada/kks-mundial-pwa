@@ -95,7 +95,7 @@ function loadSettings() {
   }
 }
 
-const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
+const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 function checkRefreshCooldown(isManual = false) {
   const cachedData = localStorage.getItem('kikes_cached_standings');
