@@ -1021,6 +1021,11 @@ body {
   color: #fff;
 }
 
+.pred-pts-badge.diff {
+  background: #3B82F6;
+  color: #fff;
+}
+
 .pred-pts-badge.outcome {
   background: #F4D35E;
   color: #0B132B;

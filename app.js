@@ -10,7 +10,7 @@ const STATE = {
 
 // DOM Cache
 const DOM = {
-  btnSettings: document.getElementById('btn-settings'),
+  btnRules: document.getElementById('btn-rules'),
   btnRefresh: document.getElementById('btn-refresh'),
   refreshIcon: document.getElementById('refresh-icon'),
   
@@ -35,11 +35,9 @@ const DOM = {
   leaderboardList: document.getElementById('leaderboard-list'),
   txtLastUpdate: document.getElementById('txt-last-update'),
   
-  // Modal
-  modalSettings: document.getElementById('modal-settings'),
-  modalClose: document.getElementById('modal-close'),
-  inputDriveId: document.getElementById('input-drive-id'),
-  btnSaveSettings: document.getElementById('btn-save-settings'),
+  // Modal Rules
+  modalRules: document.getElementById('modal-rules'),
+  modalRulesClose: document.getElementById('rules-modal-close'),
   
   // PTR
   ptrFeedback: document.getElementById('ptr-feedback'),
@@ -70,12 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Settings Management ---
 function loadSettings() {
   const storedId = localStorage.getItem('kikes_drive_file_id');
-  if (storedId) {
-    STATE.driveId = storedId;
-  } else {
-    STATE.driveId = DEFAULT_DRIVE_ID;
-  }
-  DOM.inputDriveId.value = STATE.driveId;
+  STATE.driveId = storedId || DEFAULT_DRIVE_ID;
   
   // Load cache for positions
   const cachedData = localStorage.getItem('kikes_cached_standings');
@@ -100,35 +93,6 @@ function loadSettings() {
       console.error('Error parsing cached matches', e);
     }
   }
-}
-
-function saveSettings(idOrUrl) {
-  let fileId = idOrUrl.trim();
-  
-  // Extract ID if a full URL was pasted
-  if (fileId.includes('drive.google.com') || fileId.includes('docs.google.com')) {
-    const matches = fileId.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if (matches && matches[1]) {
-      fileId = matches[1];
-    } else {
-      const urlParams = new URLSearchParams(new URL(fileId).search);
-      if (urlParams.has('id')) {
-        fileId = urlParams.get('id');
-      }
-    }
-  }
-  
-  if (!fileId) {
-    alert('ID de archivo no válido. Introduce un ID correcto.');
-    return;
-  }
-  
-  STATE.driveId = fileId;
-  localStorage.setItem('kikes_drive_file_id', fileId);
-  DOM.inputDriveId.value = fileId;
-  
-  closeModal();
-  fetchStandings();
 }
 
 const COOLDOWN_MS = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -354,28 +318,16 @@ function renderList(standings, filterText = '') {
   });
 }
 
-function renderEmptyState(isInitialConfig = false) {
+function renderEmptyState() {
   DOM.leaderboardList.innerHTML = '';
   const emptyEl = document.createElement('div');
   emptyEl.className = 'empty-state';
-  
-  if (isInitialConfig) {
-    emptyEl.innerHTML = `
-      <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-gold);"></i>
-      <h3>Sin Sincronizar</h3>
-      <p>Configura el ID de archivo de Google Drive para cargar el podio y la tabla de posiciones.</p>
-      <button class="btn-secondary" id="btn-empty-config">Configurar Ahora</button>
-    `;
-    DOM.leaderboardList.appendChild(emptyEl);
-    document.getElementById('btn-empty-config').addEventListener('click', openModal);
-  } else {
-    emptyEl.innerHTML = `
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <h3>Sin Resultados</h3>
-      <p>No se encontraron participantes que coincidan con la búsqueda.</p>
-    `;
-    DOM.leaderboardList.appendChild(emptyEl);
-  }
+  emptyEl.innerHTML = `
+    <i class="fa-solid fa-magnifying-glass"></i>
+    <h3>Sin Resultados</h3>
+    <p>No se encontraron participantes.</p>
+  `;
+  DOM.leaderboardList.appendChild(emptyEl);
 }
 
 function renderErrorState(message) {
@@ -404,24 +356,20 @@ function setLoadingState(loading) {
 }
 
 // --- Navigation & Modal UI ---
-function openModal() {
-  DOM.modalSettings.classList.remove('hidden');
+function openRulesModal() {
+  DOM.modalRules.classList.remove('hidden');
 }
 
-function closeModal() {
-  DOM.modalSettings.classList.add('hidden');
+function closeRulesModal() {
+  DOM.modalRules.classList.add('hidden');
 }
 
 // --- Event Listeners ---
 function setupEventListeners() {
-  DOM.btnSettings.addEventListener('click', openModal);
-  DOM.modalClose.addEventListener('click', closeModal);
-  DOM.modalSettings.addEventListener('click', (e) => {
-    if (e.target === DOM.modalSettings) closeModal();
-  });
-  
-  DOM.btnSaveSettings.addEventListener('click', () => {
-    saveSettings(DOM.inputDriveId.value);
+  DOM.btnRules.addEventListener('click', openRulesModal);
+  DOM.modalRulesClose.addEventListener('click', closeRulesModal);
+  DOM.modalRules.addEventListener('click', (e) => {
+    if (e.target === DOM.modalRules) closeRulesModal();
   });
   
   DOM.btnRefresh.addEventListener('click', () => {
@@ -464,7 +412,7 @@ function setupEventListeners() {
       touchMove = e.touches[0].clientY;
       const pullDist = touchMove - touchStart;
       if (pullDist > 70 && !STATE.isRefreshing) {
-        if (checkRefreshCooldown(true)) {
+        if (checkRefreshCooldown(false)) { // Silently check cooldown without showing alert
           fetchStandings();
         }
         touchStart = 0; // Prevent duplicate triggers
@@ -543,6 +491,7 @@ function renderMatches(playedMatches) {
             ${match.predictions.map(p => {
               let badgeClass = 'zero';
               if (p.points === 5) badgeClass = 'exact';
+              else if (p.points === 3) badgeClass = 'diff';
               else if (p.points === 2) badgeClass = 'outcome';
               
               return `
