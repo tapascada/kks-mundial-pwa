@@ -162,77 +162,48 @@ async function fetchStandings(force = false) {
   setLoadingState(true);
   
   const fileId = STATE.driveId;
-  // Use a cache-buster timestamp parameter to bypass browser/CDN caches
-  const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&t=${Date.now()}`;
+  // Use Google Sheets export URL to get the latest live spreadsheet data as an Excel file
+  const downloadUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&t=${Date.now()}`;
   
   try {
-    console.log(`Checking for database updates on Google Drive (force=${force})...`);
-    let shouldDownload = true;
-    let driveLastModified = null;
-    
-    // Only perform the HEAD modification check if not forced
-    if (!force) {
-      try {
-        const headResponse = await fetchWithTimeout(downloadUrl, { 
-          method: 'HEAD', 
-          cache: 'no-store', 
-          timeout: 4000,
-          credentials: 'omit'
-        });
-        if (headResponse.ok) {
-          driveLastModified = headResponse.headers.get('Last-Modified');
-          const cachedLastModified = localStorage.getItem('kikes_db_last_modified');
-          
-          if (driveLastModified && cachedLastModified && driveLastModified === cachedLastModified) {
-            shouldDownload = false;
-            console.log('Database is already up to date. Skipping download.');
-          }
-        }
-      } catch (headErr) {
-        console.warn('HEAD check failed, will proceed to download directly', headErr);
-      }
-    }
-    
-    if (!shouldDownload) {
-      alert('La base de datos ya está al día. Última actualización: ' + (STATE.lastUpdate ? STATE.lastUpdate.toLocaleString() : 'Reciente'));
-      return;
-    }
-    
-    console.log('Downloading Excel database from Google Drive...');
+    console.log('Downloading Excel database from Google Sheets...');
     const response = await fetchWithTimeout(downloadUrl, { 
       cache: 'no-store', 
-      timeout: 6000,
+      timeout: 10000,
       credentials: 'omit'
     });
-    if (!response.ok) throw new Error('Download from Google Drive failed');
+    if (!response.ok) throw new Error('Download from Google Sheets failed');
     
     const data = await response.arrayBuffer();
     
-    // Save last modified date from response
-    const lastModifiedHeader = response.headers.get('Last-Modified') || driveLastModified;
-    if (lastModifiedHeader) {
-      localStorage.setItem('kikes_db_last_modified', lastModifiedHeader);
-    }
+    // Save last modified date from response headers if available (or just store current time)
+    const lastModifiedHeader = response.headers.get('Last-Modified') || new Date().toUTCString();
+    localStorage.setItem('kikes_db_last_modified', lastModifiedHeader);
     
     await loadExcelDatabase(data);
   } catch (err) {
-    console.warn('Google Drive download failed, attempting local fallback...', err);
+    console.warn('Google Sheets download failed, attempting local fallback...', err);
     try {
       // Also cache-bust the local fallback file fetch request
       const fallbackUrl = `./KikesMundial_Posiciones.xlsm?t=${Date.now()}`;
-      const response = await fetchWithTimeout(fallbackUrl, { cache: 'no-store', timeout: 4000 });
+      const response = await fetchWithTimeout(fallbackUrl, { cache: 'no-store', timeout: 5000 });
       if (!response.ok) throw new Error('Local fallback failed');
       
       const data = await response.arrayBuffer();
       await loadExcelDatabase(data);
+      
+      if (force) {
+        alert('No se pudo conectar con Google Sheets. Se cargaron los datos locales de respaldo.');
+      }
     } catch (err2) {
       console.error('All download methods failed.', err2);
-      renderErrorState('No se pudo descargar la base de datos de Google Drive ni cargar el archivo local. Asegúrate de haber subido el archivo Excel y de que sea público.');
+      renderErrorState('No se pudo descargar la base de datos de Google Sheets ni cargar el archivo local de respaldo. Asegúrate de que el documento de Google Sheets sea público.');
     }
   } finally {
     setLoadingState(false);
   }
 }
+
 
 
 

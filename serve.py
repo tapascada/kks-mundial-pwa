@@ -8,7 +8,7 @@ mimetypes.add_type('application/javascript', '.js')
 mimetypes.add_type('application/json', '.json')
 mimetypes.add_type('image/png', '.png')
 
-PORT = 8000
+PORT = 8080
 Handler = http.server.SimpleHTTPRequestHandler
 
 class MyHTTPRequestHandler(Handler):
