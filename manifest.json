@@ -2,7 +2,7 @@
   "name": "KIKES MUNDIAL 2026",
   "short_name": "Kikes Mundial",
   "description": "Tabla de Posiciones y Podio - KIKES Mundial 2026",
-  "id": "/index.html",
+  "id": "./index.html",
   "scope": "./",
   "start_url": "./index.html",
   "display": "standalone",

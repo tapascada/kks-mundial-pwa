@@ -17,6 +17,7 @@ class MyHTTPRequestHandler(Handler):
         self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
         super().end_headers()
 
-with socketserver.TCPServer(("", PORT), MyHTTPRequestHandler) as httpd:
+# Use ThreadingHTTPServer to handle multiple concurrent browser requests without blocking
+with http.server.ThreadingHTTPServer(("", PORT), MyHTTPRequestHandler) as httpd:
     print(f"Serving at port {PORT}")
     httpd.serve_forever()

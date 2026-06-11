@@ -113,7 +113,7 @@ function loadSettings() {
   }
 }
 
-const COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+const COOLDOWN_MS = 10 * 1000; // 10 seconds cooldown to prevent rapid spam clicks while enabling easy testing
 
 function checkRefreshCooldown(isManual = false) {
   const cachedData = localStorage.getItem('kikes_cached_positions');
@@ -128,9 +128,8 @@ function checkRefreshCooldown(isManual = false) {
   
   if (elapsed < COOLDOWN_MS) {
     if (isManual) {
-      const remainingMs = COOLDOWN_MS - elapsed;
-      const remainingMin = Math.ceil(remainingMs / (60 * 1000));
-      alert(`Los datos se actualizaron recientemente.\nPara proteger el límite de cuota de Google Drive, puedes volver a solicitar datos en ${remainingMin} minuto(s).`);
+      const remainingSec = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
+      alert(`Los datos se actualizaron recientemente.\nPor favor espera ${remainingSec} segundo(s) antes de volver a actualizar.`);
     }
     return false;
   }
@@ -158,31 +157,40 @@ async function fetchWithTimeout(resource, options = {}) {
 }
 
 // --- Fetch & Load Database ---
-async function fetchStandings() {
+async function fetchStandings(force = false) {
   if (STATE.isRefreshing) return;
   setLoadingState(true);
   
   const fileId = STATE.driveId;
-  const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
+  // Use a cache-buster timestamp parameter to bypass browser/CDN caches
+  const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&t=${Date.now()}`;
   
   try {
-    console.log('Checking for database updates on Google Drive...');
+    console.log(`Checking for database updates on Google Drive (force=${force})...`);
     let shouldDownload = true;
     let driveLastModified = null;
     
-    try {
-      const headResponse = await fetchWithTimeout(downloadUrl, { method: 'HEAD', cache: 'no-store', timeout: 4000 });
-      if (headResponse.ok) {
-        driveLastModified = headResponse.headers.get('Last-Modified');
-        const cachedLastModified = localStorage.getItem('kikes_db_last_modified');
-        
-        if (driveLastModified && cachedLastModified && driveLastModified === cachedLastModified) {
-          shouldDownload = false;
-          console.log('Database is already up to date. Skipping download.');
+    // Only perform the HEAD modification check if not forced
+    if (!force) {
+      try {
+        const headResponse = await fetchWithTimeout(downloadUrl, { 
+          method: 'HEAD', 
+          cache: 'no-store', 
+          timeout: 4000,
+          credentials: 'omit'
+        });
+        if (headResponse.ok) {
+          driveLastModified = headResponse.headers.get('Last-Modified');
+          const cachedLastModified = localStorage.getItem('kikes_db_last_modified');
+          
+          if (driveLastModified && cachedLastModified && driveLastModified === cachedLastModified) {
+            shouldDownload = false;
+            console.log('Database is already up to date. Skipping download.');
+          }
         }
+      } catch (headErr) {
+        console.warn('HEAD check failed, will proceed to download directly', headErr);
       }
-    } catch (headErr) {
-      console.warn('HEAD check failed, will proceed to download directly', headErr);
     }
     
     if (!shouldDownload) {
@@ -191,7 +199,11 @@ async function fetchStandings() {
     }
     
     console.log('Downloading Excel database from Google Drive...');
-    const response = await fetchWithTimeout(downloadUrl, { cache: 'no-store', timeout: 6000 });
+    const response = await fetchWithTimeout(downloadUrl, { 
+      cache: 'no-store', 
+      timeout: 6000,
+      credentials: 'omit'
+    });
     if (!response.ok) throw new Error('Download from Google Drive failed');
     
     const data = await response.arrayBuffer();
@@ -206,7 +218,9 @@ async function fetchStandings() {
   } catch (err) {
     console.warn('Google Drive download failed, attempting local fallback...', err);
     try {
-      const response = await fetchWithTimeout('./KikesMundial_Posiciones.xlsm', { cache: 'no-store', timeout: 4000 });
+      // Also cache-bust the local fallback file fetch request
+      const fallbackUrl = `./KikesMundial_Posiciones.xlsm?t=${Date.now()}`;
+      const response = await fetchWithTimeout(fallbackUrl, { cache: 'no-store', timeout: 4000 });
       if (!response.ok) throw new Error('Local fallback failed');
       
       const data = await response.arrayBuffer();
@@ -219,6 +233,7 @@ async function fetchStandings() {
     setLoadingState(false);
   }
 }
+
 
 
 async function loadExcelDatabase(arrayBuffer) {
@@ -731,7 +746,7 @@ function setupEventListeners() {
   // Refresh Button
   DOM.btnRefresh.addEventListener('click', () => {
     if (checkRefreshCooldown(true)) {
-      fetchStandings();
+      fetchStandings(true);
     }
   });
   
@@ -850,7 +865,7 @@ function setupEventListeners() {
       const pullDist = e.touches[0].clientY - touchStart;
       if (pullDist > 70 && !STATE.isRefreshing) {
         if (checkRefreshCooldown(false)) {
-          fetchStandings();
+          fetchStandings(true);
         }
         touchStart = 0;
       }

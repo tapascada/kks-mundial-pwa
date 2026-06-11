@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kikes-mundial-v11';
+const CACHE_NAME = 'kikes-mundial-v12';
 const ASSETS = [
   './',
   './index.html',
@@ -40,8 +40,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Bypass Google Drive requests completely to prevent stale caches
-  if (event.request.url.includes('google') || event.request.url.includes('drive')) {
+  // Bypass Google Drive and Excel data files completely to prevent fetch and cache conflicts
+  const url = event.request.url;
+  if (url.includes('google') || url.includes('drive') || url.includes('.xlsm') || url.includes('.xlsx')) {
     return;
   }
 
@@ -52,4 +53,5 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
 
