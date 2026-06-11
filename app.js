@@ -926,5 +926,14 @@ function registerServiceWorker() {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => console.log('Service Worker Registered successfully! ✓', reg.scope))
       .catch(err => console.error('Service Worker registration failed:', err));
+
+    // Force automatic reload when the service worker updates and takes control
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
   }
 }
