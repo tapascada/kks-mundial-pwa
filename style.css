@@ -1041,3 +1041,137 @@ body {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Participants List & Section */
+.participants-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.participant-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(31, 41, 55, 0.3);
+  transition: background var(--transition-speed);
+}
+
+.participant-item:active {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.participant-item:last-child {
+  border-bottom: none;
+}
+
+.btn-detail {
+  background: rgba(244, 211, 94, 0.1);
+  border: 1px solid var(--accent-gold);
+  color: var(--accent-gold);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--transition-speed);
+  margin: 0 auto;
+}
+
+.btn-detail:active {
+  background: var(--accent-gold);
+  color: var(--text-dark);
+  transform: scale(0.95);
+}
+
+/* Participant predictions history card */
+.history-pred-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-pred-header {
+  font-size: 9px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding-bottom: 4px;
+}
+
+.history-pred-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.history-pred-teams {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-pred-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-score-display {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.history-score-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--card-border);
+  padding: 4px 8px;
+  border-radius: 6px;
+  min-width: 42px;
+}
+
+.history-score-box.pred {
+  border-color: rgba(244, 211, 94, 0.3);
+  background: rgba(244, 211, 94, 0.03);
+}
+
+.history-score-box-label {
+  font-size: 7px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.history-score-box-val {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.history-score-box.pred .history-score-box-val {
+  color: var(--accent-gold);
+}
+
+.participant-detail-card {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}

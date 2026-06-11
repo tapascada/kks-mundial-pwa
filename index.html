@@ -16,8 +16,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
-  <!-- SheetJS -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- SQLite sql.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
   
   <!-- Styles -->
   <link rel="stylesheet" href="style.css">
@@ -43,9 +43,14 @@
           <p>POLLA MUNDIALISTA 2026</p>
         </div>
       </div>
-      <button id="btn-refresh" class="header-btn" aria-label="Actualizar datos">
-        <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
-      </button>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button id="btn-settings" class="header-btn" aria-label="Configurar origen de datos">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+        <button id="btn-refresh" class="header-btn" aria-label="Actualizar datos">
+          <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+        </button>
+      </div>
     </header>
 
     <!-- Main Scrollable Content -->
@@ -136,6 +141,37 @@
         </section>
       </div>
 
+      <!-- Panel Participantes (Oculto) -->
+      <div id="view-participantes" class="view-panel hidden">
+        <section class="search-section">
+          <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="participant-search-input" placeholder="Buscar participante...">
+            <button id="clear-participant-search" class="clear-search-btn">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </section>
+
+        <section class="participants-section">
+          <div class="leaderboard-card">
+            <div class="table-header">
+              <div class="col-rank">Puesto</div>
+              <div class="col-name">Participante</div>
+              <div class="col-details">Total Puntos</div>
+              <div class="col-total">Acción</div>
+            </div>
+            <div id="participants-list" class="participants-list">
+              <!-- Loaded dynamically in JS -->
+              <div class="loading-state">
+                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <p>Cargando participantes...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
       <!-- Last Update info -->
       <div class="update-info">
         <p id="txt-last-update">Última actualización: Desconocida</p>
@@ -149,12 +185,38 @@
         <i class="fa-solid fa-chart-simple"></i>
         <span>Posiciones</span>
       </button>
+      <button class="nav-tab" id="tab-participantes">
+        <i class="fa-solid fa-users"></i>
+        <span>Participantes</span>
+      </button>
       <button class="nav-tab" id="tab-partidos">
         <i class="fa-solid fa-circle-play"></i>
         <span>Partidos</span>
       </button>
     </nav>
 
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="modal-settings" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-gear"></i> Configuración PWA</h3>
+        <button id="settings-modal-close" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" style="padding-bottom: 15px; display: flex; flex-direction: column; gap: 15px;">
+        <p class="modal-info">Ingresa el ID del archivo de Google Drive donde guardas el archivo kikes_mundial.db.</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          <label for="input-drive-id" style="font-size: 13px; font-weight: bold; color: var(--accent-gold); text-align: left;">ID del Archivo de Google Drive:</label>
+          <input type="text" id="input-drive-id" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" placeholder="Pega el ID del archivo aquí...">
+        </div>
+        
+        <button id="btn-save-settings" style="background: var(--accent-gold); color: #0b132b; border: none; padding: 12px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 14px; transition: opacity 0.2s;">
+          Guardar y Sincronizar
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Rules Modal -->
@@ -204,6 +266,82 @@
   </div>
 
 
+
+  <!-- Participant Detail Modal -->
+  <div id="modal-participant-detail" class="modal-overlay hidden">
+    <div class="modal-card participant-detail-card">
+      <div class="modal-header">
+        <h3 id="detail-participant-name"><i class="fa-solid fa-user-tie"></i> Nombre</h3>
+        <button id="participant-modal-close" class="modal-close-btn" style="font-size: 14px; font-weight: 600; color: var(--accent-gold); display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-chevron-left"></i> Volver</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; flex: 1; padding-bottom: 15px; display: flex; flex-direction: column; gap: 15px;">
+        
+        <!-- Summary Stats -->
+        <div class="participant-summary-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 5px;">
+          <div class="summary-stat" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 3px;">
+            <span class="stat-label" style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px;">Total</span>
+            <span class="stat-value" id="detail-total-points" style="font-size: 20px; font-weight: 800; color: var(--accent-gold);">0 pts</span>
+          </div>
+          <div class="summary-stat" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 3px;">
+            <span class="stat-label" style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px;">Partidos</span>
+            <span class="stat-value" id="detail-match-points" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">0 pts</span>
+          </div>
+          <div class="summary-stat" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px; border-radius: 12px; text-align: center; display: flex; flex-direction: column; gap: 3px;">
+            <span class="stat-label" style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px;">Comodines</span>
+            <span class="stat-value" id="detail-wildcard-points" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">0 pts</span>
+          </div>
+        </div>
+
+        <!-- Wildcards / Pronósticos de Podio -->
+        <div class="wildcards-panel">
+          <h4 class="section-subtitle" style="font-size: 13px; color: var(--accent-gold); text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid var(--card-border); padding-bottom: 5px; font-weight: 600;">🏆 Pronósticos de Podio</h4>
+          <div class="wildcards-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div class="wildcard-item" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px; border: 1px solid var(--card-border);">
+              <div class="wc-badge gold" style="font-size: 16px;">🥇</div>
+              <div class="wc-info" style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                <span class="wc-label" style="font-size: 10px; color: var(--text-secondary);">Campeón</span>
+                <span class="wc-value" id="detail-wc-winner" style="font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+              </div>
+              <span class="wc-pts" id="detail-wc-winner-pts" style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">0 pts</span>
+            </div>
+            <div class="wildcard-item" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px; border: 1px solid var(--card-border);">
+              <div class="wc-badge silver" style="font-size: 16px;">🥈</div>
+              <div class="wc-info" style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                <span class="wc-label" style="font-size: 10px; color: var(--text-secondary);">Subcampeón</span>
+                <span class="wc-value" id="detail-wc-second" style="font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+              </div>
+              <span class="wc-pts" id="detail-wc-second-pts" style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">0 pts</span>
+            </div>
+            <div class="wildcard-item" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px; border: 1px solid var(--card-border);">
+              <div class="wc-badge bronze" style="font-size: 16px;">🥉</div>
+              <div class="wc-info" style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                <span class="wc-label" style="font-size: 10px; color: var(--text-secondary);">Tercero</span>
+                <span class="wc-value" id="detail-wc-third" style="font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+              </div>
+              <span class="wc-pts" id="detail-wc-third-pts" style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">0 pts</span>
+            </div>
+            <div class="wildcard-item" style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 10px; border: 1px solid var(--card-border);">
+              <div class="wc-badge scorer" style="font-size: 16px;">🏃</div>
+              <div class="wc-info" style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
+                <span class="wc-label" style="font-size: 10px; color: var(--text-secondary);">Goleador</span>
+                <span class="wc-value" id="detail-wc-scorer" style="font-size: 12px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">-</span>
+              </div>
+              <span class="wc-pts" id="detail-wc-scorer-pts" style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">0 pts</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Predictions List -->
+        <div class="predictions-history-panel" style="display: flex; flex-direction: column; flex: 1; min-height: 250px;">
+          <h4 class="section-subtitle" style="font-size: 13px; color: var(--accent-gold); text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid var(--card-border); padding-bottom: 5px; font-weight: 600;">⚽ Detalle de Pronósticos</h4>
+          <div id="detail-predictions-list" class="predictions-history-list" style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;">
+            <!-- Loaded dynamically in JS -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
