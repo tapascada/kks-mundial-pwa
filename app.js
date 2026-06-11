@@ -44,13 +44,6 @@ const DOM = {
   // Modal Rules
   modalRules: document.getElementById('modal-rules'),
   modalRulesClose: document.getElementById('rules-modal-close'),
-
-  // Modal Settings
-  btnSettings: document.getElementById('btn-settings'),
-  modalSettings: document.getElementById('modal-settings'),
-  settingsModalClose: document.getElementById('settings-modal-close'),
-  inputDriveId: document.getElementById('input-drive-id'),
-  btnSaveSettings: document.getElementById('btn-save-settings'),
   
   // Modal Participant Detail
   modalParticipantDetail: document.getElementById('modal-participant-detail'),
@@ -107,11 +100,7 @@ function uint8ArrayToBase64(uint8Array) {
 }
 
 function loadSettings() {
-  const storedId = localStorage.getItem('kikes_drive_file_id');
-  STATE.driveId = storedId || DEFAULT_DRIVE_ID;
-  if (DOM.inputDriveId) {
-    DOM.inputDriveId.value = STATE.driveId;
-  }
+  STATE.driveId = DEFAULT_DRIVE_ID;
   
   const cachedDbBase64 = localStorage.getItem('kikes_db_binary');
   const cachedTime = localStorage.getItem('kikes_cached_time');
@@ -161,38 +150,76 @@ function checkRefreshCooldown(isManual = false) {
 }
 
 // --- Fetch & Load Database ---
+function isSQLiteDatabase(arrayBuffer) {
+  if (arrayBuffer.byteLength < 16) return false;
+  const arr = new Uint8Array(arrayBuffer.slice(0, 15));
+  const expected = [83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51]; // "SQLite format 3"
+  for (let i = 0; i < expected.length; i++) {
+    if (arr[i] !== expected[i]) return false;
+  }
+  return true;
+}
+
 async function fetchStandings() {
   if (STATE.isRefreshing) return;
   setLoadingState(true);
   
   const fileId = STATE.driveId;
-  const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(downloadUrl)}`;
+  const downloadUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download`;
   
   try {
-    console.log('Fetching database from Google Drive...');
+    console.log('Checking for database updates on Google Drive...');
+    let shouldDownload = true;
+    let driveLastModified = null;
+    
+    try {
+      const headResponse = await fetch(downloadUrl, { method: 'HEAD' });
+      if (headResponse.ok) {
+        driveLastModified = headResponse.headers.get('Last-Modified');
+        const cachedLastModified = localStorage.getItem('kikes_db_last_modified');
+        
+        if (driveLastModified && cachedLastModified && driveLastModified === cachedLastModified) {
+          shouldDownload = false;
+          console.log('Database is already up to date. Skipping download.');
+        }
+      }
+    } catch (headErr) {
+      console.warn('HEAD check failed, will proceed to download directly', headErr);
+    }
+    
+    if (!shouldDownload) {
+      alert('La base de datos ya está al día. Última actualización: ' + (STATE.lastUpdate ? STATE.lastUpdate.toLocaleString() : 'Reciente'));
+      setLoadingState(false);
+      return;
+    }
+    
+    console.log('Downloading database from Google Drive...');
     const response = await fetch(downloadUrl);
-    if (!response.ok) throw new Error('Direct download failed');
+    if (!response.ok) throw new Error('Download from Google Drive failed');
+    
     const data = await response.arrayBuffer();
+    if (!isSQLiteDatabase(data)) throw new Error('Downloaded file is not a valid SQLite database');
+    
+    // Save last modified date from response
+    const lastModifiedHeader = response.headers.get('Last-Modified') || driveLastModified;
+    if (lastModifiedHeader) {
+      localStorage.setItem('kikes_db_last_modified', lastModifiedHeader);
+    }
+    
     await loadDatabase(data);
   } catch (err) {
-    console.warn('Direct download failed, falling back to CORS proxy...', err);
+    console.warn('Google Drive download failed, attempting local fallback...', err);
     try {
-      const response = await fetch(proxyUrl);
-      if (!response.ok) throw new Error('CORS proxy download failed');
+      const response = await fetch('./kikes_mundial.db');
+      if (!response.ok) throw new Error('Local fallback failed');
+      
       const data = await response.arrayBuffer();
+      if (!isSQLiteDatabase(data)) throw new Error('Local file is not a valid SQLite database');
+      
       await loadDatabase(data);
     } catch (err2) {
-      console.warn('Google Drive download failed, attempting local fallback for testing...', err2);
-      try {
-        const response = await fetch('./kikes_mundial.db');
-        if (!response.ok) throw new Error('Local fallback failed');
-        const data = await response.arrayBuffer();
-        await loadDatabase(data);
-      } catch (err3) {
-        console.error('All download methods failed.', err3);
-        renderErrorState('No se pudo descargar la base de datos de Google Drive ni cargar el archivo local. Verifica que el enlace sea público.');
-      }
+      console.error('All download methods failed.', err2);
+      renderErrorState('No se pudo descargar la base de datos de Google Drive ni cargar el archivo local. Asegúrate de haber ingresado el ID de Google Drive correcto y de que el archivo sea público.');
     }
   }
   setLoadingState(false);
@@ -649,7 +676,7 @@ function renderEmptyState() {
     <div class="empty-state">
       <i class="fa-solid fa-magnifying-glass"></i>
       <h3>Sin Datos</h3>
-      <p>Configura tu ID de Google Drive para iniciar.</p>
+      <p>No se pudo cargar la base de datos de la polla.</p>
     </div>
   `;
 }
@@ -686,40 +713,6 @@ function setupEventListeners() {
     if (e.target === DOM.modalRules) DOM.modalRules.classList.add('hidden');
   });
 
-  // Modal Settings
-  if (DOM.btnSettings) {
-    DOM.btnSettings.addEventListener('click', () => {
-      DOM.inputDriveId.value = STATE.driveId;
-      DOM.modalSettings.classList.remove('hidden');
-    });
-  }
-  if (DOM.settingsModalClose) {
-    DOM.settingsModalClose.addEventListener('click', () => DOM.modalSettings.classList.add('hidden'));
-  }
-  if (DOM.modalSettings) {
-    DOM.modalSettings.addEventListener('click', (e) => {
-      if (e.target === DOM.modalSettings) DOM.modalSettings.classList.add('hidden');
-    });
-  }
-  if (DOM.btnSaveSettings) {
-    DOM.btnSaveSettings.addEventListener('click', () => {
-      const newId = DOM.inputDriveId.value.trim();
-      if (!newId) {
-        alert('Por favor ingresa un ID de archivo válido.');
-        return;
-      }
-      localStorage.setItem('kikes_drive_file_id', newId);
-      STATE.driveId = newId;
-      DOM.modalSettings.classList.add('hidden');
-      
-      // Force update standings with the new file
-      // Clear db binary cache to force redownload
-      localStorage.removeItem('kikes_db_binary');
-      localStorage.removeItem('kikes_cached_time');
-      fetchStandings();
-    });
-  }
-  
   // Modal Participant Detail
   DOM.participantModalClose.addEventListener('click', closeParticipantDetailModal);
   DOM.modalParticipantDetail.addEventListener('click', (e) => {

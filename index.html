@@ -43,14 +43,9 @@
           <p>POLLA MUNDIALISTA 2026</p>
         </div>
       </div>
-      <div style="display: flex; gap: 12px; align-items: center;">
-        <button id="btn-settings" class="header-btn" aria-label="Configurar origen de datos">
-          <i class="fa-solid fa-gear"></i>
-        </button>
-        <button id="btn-refresh" class="header-btn" aria-label="Actualizar datos">
-          <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
-        </button>
-      </div>
+      <button id="btn-refresh" class="header-btn" aria-label="Actualizar datos">
+        <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i>
+      </button>
     </header>
 
     <!-- Main Scrollable Content -->
@@ -195,28 +190,6 @@
       </button>
     </nav>
 
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="modal-settings" class="modal-overlay hidden">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-gear"></i> Configuración PWA</h3>
-        <button id="settings-modal-close" class="modal-close-btn">&times;</button>
-      </div>
-      <div class="modal-body" style="padding-bottom: 15px; display: flex; flex-direction: column; gap: 15px;">
-        <p class="modal-info">Ingresa el ID del archivo de Google Drive donde guardas el archivo kikes_mundial.db.</p>
-        
-        <div style="display: flex; flex-direction: column; gap: 6px;">
-          <label for="input-drive-id" style="font-size: 13px; font-weight: bold; color: var(--accent-gold); text-align: left;">ID del Archivo de Google Drive:</label>
-          <input type="text" id="input-drive-id" style="background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 8px; color: var(--text-primary); font-size: 14px; outline: none;" placeholder="Pega el ID del archivo aquí...">
-        </div>
-        
-        <button id="btn-save-settings" style="background: var(--accent-gold); color: #0b132b; border: none; padding: 12px; border-radius: 8px; font-weight: 800; cursor: pointer; font-size: 14px; transition: opacity 0.2s;">
-          Guardar y Sincronizar
-        </button>
-      </div>
-    </div>
   </div>
 
   <!-- Rules Modal -->
