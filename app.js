@@ -197,7 +197,7 @@ async function fetchStandings(force = false) {
       }
     } catch (err2) {
       console.error('All download methods failed.', err2);
-      renderErrorState('No se pudo descargar la base de datos de Google Sheets ni cargar el archivo local de respaldo. Asegúrate de que el documento de Google Sheets sea público.');
+      renderErrorState('No se pudo descargar la base de datos de Google Sheets ni cargar el archivo local de respaldo. Asegúrate de que el documento de Google Sheets sea público.', force);
     }
   } finally {
     setLoadingState(false);
@@ -676,7 +676,14 @@ function renderEmptyState() {
 }
 
 // --- Empty / Error States ---
-function renderErrorState(message) {
+function renderErrorState(message, isManual = false) {
+  if (STATE.positions && STATE.positions.length > 0) {
+    if (isManual) {
+      alert(`No se pudieron actualizar los datos:\n${message}`);
+    }
+    return;
+  }
+  
   DOM.leaderboardList.innerHTML = `
     <div class="error-state">
       <i class="fa-solid fa-triangle-exclamation"></i>
@@ -685,7 +692,7 @@ function renderErrorState(message) {
       <button class="btn-secondary" id="btn-error-retry">Reintentar</button>
     </div>
   `;
-  document.getElementById('btn-error-retry').addEventListener('click', fetchStandings);
+  document.getElementById('btn-error-retry').addEventListener('click', () => fetchStandings(true));
 }
 
 function setLoadingState(loading) {
