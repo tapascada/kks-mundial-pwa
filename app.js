@@ -83,7 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // 4. Fetch initial data if cache empty or cooldown expired
   if (STATE.driveId) {
     const hasCache = localStorage.getItem('kikes_cached_positions');
-    if (!hasCache || checkRefreshCooldown(false)) {
+    if (!navigator.onLine) {
+      showToast('Estás sin conexión. Mostrando datos guardados offline.', 'info');
+    } else if (!hasCache || checkRefreshCooldown(false)) {
       fetchStandings();
     }
   } else {
@@ -129,7 +131,7 @@ function checkRefreshCooldown(isManual = false) {
   if (elapsed < COOLDOWN_MS) {
     if (isManual) {
       const remainingSec = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
-      alert(`Los datos se actualizaron recientemente.\nPor favor espera ${remainingSec} segundo(s) antes de volver a actualizar.`);
+      showToast(`Espera ${remainingSec} segundo(s) antes de volver a actualizar.`, 'info');
     }
     return false;
   }
@@ -159,6 +161,13 @@ async function fetchWithTimeout(resource, options = {}) {
 // --- Fetch & Load Database ---
 async function fetchStandings(force = false) {
   if (STATE.isRefreshing) return;
+  
+  // Immediately fail if offline
+  if (!navigator.onLine) {
+    showToast('Sin conexión a internet. No se pueden actualizar los datos.', 'warning');
+    return;
+  }
+
   setLoadingState(true);
   
   const fileId = STATE.driveId;
@@ -181,6 +190,10 @@ async function fetchStandings(force = false) {
     localStorage.setItem('kikes_db_last_modified', lastModifiedHeader);
     
     await loadExcelDatabase(data);
+    
+    if (force) {
+      showToast('Datos actualizados correctamente.', 'success');
+    }
   } catch (err) {
     console.warn('Google Sheets download failed, attempting local fallback...', err);
     try {
@@ -193,11 +206,11 @@ async function fetchStandings(force = false) {
       await loadExcelDatabase(data);
       
       if (force) {
-        alert('No se pudo conectar con Google Sheets. Se cargaron los datos locales de respaldo.');
+        showToast('Usando datos de respaldo local (Sheets no disponible).', 'warning');
       }
     } catch (err2) {
       console.error('All download methods failed.', err2);
-      renderErrorState('No se pudo descargar la base de datos de Google Sheets ni cargar el archivo local de respaldo. Asegúrate de que el documento de Google Sheets sea público.', force);
+      renderErrorState('No se pudo descargar la base de datos de Google Sheets ni cargar el respaldo local.', force);
     }
   } finally {
     setLoadingState(false);
@@ -679,7 +692,7 @@ function renderEmptyState() {
 function renderErrorState(message, isManual = false) {
   if (STATE.positions && STATE.positions.length > 0) {
     if (isManual) {
-      alert(`No se pudieron actualizar los datos:\n${message}`);
+      showToast(message, 'error');
     }
     return;
   }
@@ -692,7 +705,13 @@ function renderErrorState(message, isManual = false) {
       <button class="btn-secondary" id="btn-error-retry">Reintentar</button>
     </div>
   `;
-  document.getElementById('btn-error-retry').addEventListener('click', () => fetchStandings(true));
+  document.getElementById('btn-error-retry').addEventListener('click', () => {
+    if (!navigator.onLine) {
+      showToast('Sin conexión a internet.', 'warning');
+      return;
+    }
+    fetchStandings(true);
+  });
 }
 
 function setLoadingState(loading) {
@@ -723,6 +742,10 @@ function setupEventListeners() {
   
   // Refresh Button
   DOM.btnRefresh.addEventListener('click', () => {
+    if (!navigator.onLine) {
+      showToast('Sin conexión a internet. No se pueden actualizar los datos.', 'warning');
+      return;
+    }
     if (checkRefreshCooldown(true)) {
       fetchStandings(true);
     }
@@ -831,17 +854,35 @@ function setupEventListeners() {
   // Pull-to-refresh swipe gesture
   let touchStart = 0;
   DOM.mainContent.addEventListener('touchstart', (e) => {
-    if (DOM.mainContent.scrollTop === 0) {
-      touchStart = e.touches[0].clientY;
-    } else {
+    // Only allow pull-to-refresh if we are at the very top of the window scroll
+    const windowAtTop = (window.scrollY || document.documentElement.scrollTop) === 0;
+    if (!windowAtTop) {
       touchStart = 0;
+      return;
     }
+
+    // Check if the scrollable list inside the active view is also at the top
+    const activePanel = document.querySelector('.view-panel:not(.hidden)');
+    if (activePanel) {
+      const scrollableList = activePanel.querySelector('.leaderboard-list, .participants-list, .matches-list');
+      if (scrollableList && scrollableList.scrollTop > 0) {
+        touchStart = 0;
+        return;
+      }
+    }
+    
+    touchStart = e.touches[0].clientY;
   }, { passive: true });
   
   DOM.mainContent.addEventListener('touchmove', (e) => {
     if (touchStart > 0) {
       const pullDist = e.touches[0].clientY - touchStart;
       if (pullDist > 70 && !STATE.isRefreshing) {
+        if (!navigator.onLine) {
+          showToast('Sin conexión a internet. No se pueden actualizar los datos.', 'warning');
+          touchStart = 0;
+          return;
+        }
         if (checkRefreshCooldown(false)) {
           fetchStandings(true);
         }
@@ -912,4 +953,35 @@ function registerServiceWorker() {
       }
     });
   }
+}
+
+// --- Toast Notification System ---
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  
+  let iconHtml = '';
+  if (type === 'success') iconHtml = '<i class="fa-solid fa-circle-check toast-icon"></i>';
+  else if (type === 'error') iconHtml = '<i class="fa-solid fa-triangle-exclamation toast-icon"></i>';
+  else if (type === 'warning') iconHtml = '<i class="fa-solid fa-circle-exclamation toast-icon"></i>';
+  else iconHtml = '<i class="fa-solid fa-circle-info toast-icon"></i>';
+  
+  toast.innerHTML = `
+    ${iconHtml}
+    <span class="toast-message">${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  // Trigger transition
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => toast.remove());
+  }, 4000);
 }
