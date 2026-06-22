@@ -126,8 +126,25 @@
 
       <!-- Panel Partidos (Oculto) -->
       <div id="view-partidos" class="view-panel hidden">
+        <section class="search-section" style="margin-bottom: 10px;">
+          <div class="search-bar">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="match-search-input" placeholder="Buscar etapa, grupo o país...">
+            <button id="clear-match-search" class="clear-search-btn">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </section>
+        <section class="search-section" style="margin-bottom: 0px; padding-bottom: 0px;">
+          <div class="matches-filter-bar">
+            <button class="filter-chip active" data-status="ALL">Todos</button>
+            <button class="filter-chip" data-status="EN VIVO">🔴 En Vivo</button>
+            <button class="filter-chip" data-status="PREVIA">⏳ Previa</button>
+            <button class="filter-chip" data-status="TERMINADO">✅ Terminados</button>
+          </div>
+        </section>
         <section class="matches-section">
-          <h2 class="section-title">PARTIDOS JUGADOS</h2>
+          <h2 class="section-title">PARTIDOS</h2>
           <div id="matches-list" class="matches-list">
             <!-- Loaded dynamically in JS -->
             <div class="loading-state">

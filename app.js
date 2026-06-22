@@ -1,4 +1,4 @@
-const DEFAULT_DRIVE_ID = '1S6HbVBKvv3iTT6bnA6UiQDsNdPfXTNVt';
+const DEFAULT_DRIVE_ID = '1M6eHtASvlV8Zhw8L1NopI1ADSzkz6gtG-pAHR2Hh66k';
 
 const STATE = {
   driveId: DEFAULT_DRIVE_ID,
@@ -6,7 +6,8 @@ const STATE = {
   matches: [],
   predictions: [],
   lastUpdate: null,
-  isRefreshing: false
+  isRefreshing: false,
+  activeMatchesFilter: 'ALL'
 };
 
 // DOM Cache (lazy getters to avoid element timing issues)
@@ -41,6 +42,8 @@ const DOM = {
   get clearSearch() { return document.getElementById('clear-search'); },
   get participantSearchInput() { return document.getElementById('participant-search-input'); },
   get clearParticipantSearch() { return document.getElementById('clear-participant-search'); },
+  get matchSearchInput() { return document.getElementById('match-search-input'); },
+  get clearMatchSearch() { return document.getElementById('clear-match-search'); },
   get txtLastUpdate() { return document.getElementById('txt-last-update'); },
   
   // Modal Rules
@@ -258,7 +261,8 @@ async function loadExcelDatabase(arrayBuffer) {
       team1: String(r['Equipo Local'] || '').trim(),
       team2: String(r['Equipo Visitante'] || '').trim(),
       realGoals1: r['Goles Local'] === "" || r['Goles Local'] === undefined ? null : parseInt(r['Goles Local']),
-      realGoals2: r['Goles Visitante'] === "" || r['Goles Visitante'] === undefined ? null : parseInt(r['Goles Visitante'])
+      realGoals2: r['Goles Visitante'] === "" || r['Goles Visitante'] === undefined ? null : parseInt(r['Goles Visitante']),
+      status: String(r['Estado'] || ( (r['Goles Local'] !== "" && r['Goles Local'] !== undefined && r['Goles Visitante'] !== "" && r['Goles Visitante'] !== undefined) ? 'TERMINADO' : 'PREVIA' )).trim().toUpperCase()
     })).filter(m => m.id > 0);
 
     // 3. Parse Pronosticos
@@ -314,9 +318,18 @@ function renderUI() {
   renderPodium(standingsWithRank);
   renderList(standingsWithRank, DOM.searchInput.value);
 
-  // Matches sorted descending by ID
-  const sortedMatches = [...STATE.matches].sort((a, b) => b.id - a.id);
-  renderMatches(sortedMatches);
+  // Matches sorted: EN VIVO first, then PREVIA, then TERMINADO
+  const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
+  const sortedMatches = [...STATE.matches].sort((a, b) => {
+    const statusA = (a.status || 'PREVIA').toUpperCase();
+    const statusB = (b.status || 'PREVIA').toUpperCase();
+    if (statusOrder[statusA] !== statusOrder[statusB]) {
+      return statusOrder[statusA] - statusOrder[statusB];
+    }
+    if (statusA === 'TERMINADO') return b.id - a.id;
+    return a.id - b.id;
+  });
+  renderMatches(sortedMatches, STATE.activeMatchesFilter || 'ALL');
 
   renderParticipantsList(standingsWithRank, DOM.participantSearchInput.value);
 
@@ -401,35 +414,63 @@ function renderList(standings, filterText = '') {
 }
 
 // --- Render Matches Tab ---
-function renderMatches(matches) {
+function renderMatches(matches, activeStatusFilter = 'ALL') {
   DOM.matchesList.innerHTML = '';
   
-  // A match is played/completed if it has real goals assigned in the database
-  const playedMatches = matches.filter(m => m.realGoals1 !== null && m.realGoals2 !== null);
+  const searchVal = DOM.matchSearchInput ? DOM.matchSearchInput.value.toLowerCase().trim() : '';
   
-  if (playedMatches.length === 0) {
+  // Filter matches by selected status and search query
+  const filtered = matches.filter(m => {
+    if (activeStatusFilter !== 'ALL') {
+      if ((m.status || 'PREVIA').toUpperCase() !== activeStatusFilter.toUpperCase()) {
+        return false;
+      }
+    }
+    
+    if (searchVal) {
+      const stage = (m.groupStage || '').toLowerCase();
+      const t1 = (m.team1 || '').toLowerCase();
+      const t2 = (m.team2 || '').toLowerCase();
+      if (!stage.includes(searchVal) && !t1.includes(searchVal) && !t2.includes(searchVal)) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+  
+  if (filtered.length === 0) {
     DOM.matchesList.innerHTML = `
       <div class="empty-state">
         <i class="fa-solid fa-circle-play"></i>
         <h3>Sin Partidos</h3>
-        <p>No hay partidos finalizados con resultados cargados todavía.</p>
+        <p>No hay partidos que coincidan con el filtro seleccionado.</p>
       </div>
     `;
     return;
   }
   
-  playedMatches.forEach(match => {
+  filtered.forEach(match => {
     const cardEl = document.createElement('div');
     cardEl.className = 'match-card';
     
+    const isCompleted = match.realGoals1 !== null && match.realGoals2 !== null;
+    const isLive = (match.status || 'PREVIA').toUpperCase() === 'EN VIVO';
+    const finalScoreText = (isCompleted || (isLive && (match.realGoals1 !== null || match.realGoals2 !== null))) 
+      ? `${match.realGoals1 ?? 0} - ${match.realGoals2 ?? 0}` 
+      : 'vs';
+    
     cardEl.innerHTML = `
-      <div class="match-card-header">${match.groupStage}</div>
+      <div class="match-card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>${match.groupStage}</span>
+        <span class="match-status-badge status-${(match.status || 'PREVIA').toLowerCase().replace(' ', '-')}">${match.status || 'PREVIA'}</span>
+      </div>
       <div class="match-card-teams">
         <div class="team-info team-local-info">
           <span class="match-team team-local">${match.team1}</span>
           <img src="${getFlagUrl(match.team1)}" class="match-flag flag-local" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
         </div>
-        <span class="match-score-pill">${match.realGoals1} - ${match.realGoals2}</span>
+        <span class="match-score-pill ${isLive ? 'score-live' : ''}">${finalScoreText}</span>
         <div class="team-info team-visit-info">
           <img src="${getFlagUrl(match.team2)}" class="match-flag flag-visit" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
           <span class="match-team team-visit">${match.team2}</span>
@@ -725,8 +766,31 @@ function setLoadingState(loading) {
   }
 }
 
-// --- Event Listeners Setup ---
 function setupEventListeners() {
+  // Matches Filter Chips
+  const filterChips = document.querySelectorAll('.matches-filter-bar .filter-chip');
+  filterChips.forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      filterChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const statusFilter = chip.getAttribute('data-status');
+      
+      STATE.activeMatchesFilter = statusFilter;
+      
+      const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
+      const sortedMatches = [...STATE.matches].sort((a, b) => {
+        const statusA = (a.status || 'PREVIA').toUpperCase();
+        const statusB = (b.status || 'PREVIA').toUpperCase();
+        if (statusOrder[statusA] !== statusOrder[statusB]) {
+          return statusOrder[statusA] - statusOrder[statusB];
+        }
+        if (statusA === 'TERMINADO') return b.id - a.id;
+        return a.id - b.id;
+      });
+      renderMatches(sortedMatches, statusFilter);
+    });
+  });
+
   // Modal Rules
   DOM.btnRules.addEventListener('click', () => DOM.modalRules.classList.remove('hidden'));
   DOM.modalRulesClose.addEventListener('click', () => DOM.modalRules.classList.add('hidden'));
@@ -849,6 +913,44 @@ function setupEventListeners() {
       });
       renderParticipantsList(standingsWithRank, '');
     }
+  });
+
+  // Search Matches
+  DOM.matchSearchInput.addEventListener('input', (e) => {
+    const text = e.target.value;
+    if (text) {
+      DOM.clearMatchSearch.classList.add('show');
+    } else {
+      DOM.clearMatchSearch.classList.remove('show');
+    }
+    
+    const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
+    const sortedMatches = [...STATE.matches].sort((a, b) => {
+      const statusA = (a.status || 'PREVIA').toUpperCase();
+      const statusB = (b.status || 'PREVIA').toUpperCase();
+      if (statusOrder[statusA] !== statusOrder[statusB]) {
+        return statusOrder[statusA] - statusOrder[statusB];
+      }
+      if (statusA === 'TERMINADO') return b.id - a.id;
+      return a.id - b.id;
+    });
+    renderMatches(sortedMatches, STATE.activeMatchesFilter);
+  });
+  
+  DOM.clearMatchSearch.addEventListener('click', () => {
+    DOM.matchSearchInput.value = '';
+    DOM.clearMatchSearch.classList.remove('show');
+    const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
+    const sortedMatches = [...STATE.matches].sort((a, b) => {
+      const statusA = (a.status || 'PREVIA').toUpperCase();
+      const statusB = (b.status || 'PREVIA').toUpperCase();
+      if (statusOrder[statusA] !== statusOrder[statusB]) {
+        return statusOrder[statusA] - statusOrder[statusB];
+      }
+      if (statusA === 'TERMINADO') return b.id - a.id;
+      return a.id - b.id;
+    });
+    renderMatches(sortedMatches, STATE.activeMatchesFilter);
   });
   
   // Pull-to-refresh swipe gesture
