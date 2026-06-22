@@ -44,6 +44,10 @@ const DOM = {
   get clearParticipantSearch() { return document.getElementById('clear-participant-search'); },
   get matchSearchInput() { return document.getElementById('match-search-input'); },
   get clearMatchSearch() { return document.getElementById('clear-match-search'); },
+  get countPlayed() { return document.getElementById('count-played'); },
+  get countLive() { return document.getElementById('count-live'); },
+  get countPrevia() { return document.getElementById('count-previa'); },
+  get countPending() { return document.getElementById('count-pending'); },
   get txtLastUpdate() { return document.getElementById('txt-last-update'); },
   
   // Modal Rules
@@ -416,6 +420,17 @@ function renderList(standings, filterText = '') {
 // --- Render Matches Tab ---
 function renderMatches(matches, activeStatusFilter = 'ALL') {
   DOM.matchesList.innerHTML = '';
+  
+  // Update counters
+  const playedCount = STATE.matches.filter(m => (m.status || 'PREVIA').toUpperCase() === 'TERMINADO').length;
+  const liveCount = STATE.matches.filter(m => (m.status || 'PREVIA').toUpperCase() === 'EN VIVO').length;
+  const previaCount = STATE.matches.filter(m => (m.status || 'PREVIA').toUpperCase() === 'PREVIA').length;
+  const pendingCount = STATE.matches.filter(m => (m.status || 'PREVIA').toUpperCase() === 'PENDIENTE').length;
+  
+  if (DOM.countPlayed) DOM.countPlayed.innerText = playedCount;
+  if (DOM.countLive) DOM.countLive.innerText = liveCount;
+  if (DOM.countPrevia) DOM.countPrevia.innerText = previaCount;
+  if (DOM.countPending) DOM.countPending.innerText = pendingCount;
   
   const searchVal = DOM.matchSearchInput ? DOM.matchSearchInput.value.toLowerCase().trim() : '';
   
