@@ -322,17 +322,8 @@ function renderUI() {
   renderPodium(standingsWithRank);
   renderList(standingsWithRank, DOM.searchInput.value);
 
-  // Matches sorted: EN VIVO first, then PREVIA, then TERMINADO
-  const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
-  const sortedMatches = [...STATE.matches].sort((a, b) => {
-    const statusA = (a.status || 'PREVIA').toUpperCase();
-    const statusB = (b.status || 'PREVIA').toUpperCase();
-    if (statusOrder[statusA] !== statusOrder[statusB]) {
-      return statusOrder[statusA] - statusOrder[statusB];
-    }
-    if (statusA === 'TERMINADO') return b.id - a.id;
-    return a.id - b.id;
-  });
+  // Matches sorted: EN VIVO → PREVIA → PENDIENTE → TERMINADO
+  const sortedMatches = sortMatchesByStatus(STATE.matches);
   renderMatches(sortedMatches, STATE.activeMatchesFilter || 'ALL');
 
   renderParticipantsList(standingsWithRank, DOM.participantSearchInput.value);
@@ -414,6 +405,22 @@ function renderList(standings, filterText = '') {
     `;
     
     DOM.leaderboardList.appendChild(itemEl);
+  });
+}
+
+// --- Sort matches by status priority: EN VIVO → PREVIA → PENDIENTE → TERMINADO ---
+function sortMatchesByStatus(matches) {
+  const STATUS_ORDER = { 'EN VIVO': 0, 'PREVIA': 1, 'PENDIENTE': 2, 'TERMINADO': 3 };
+  return [...matches].sort((a, b) => {
+    const statusA = (a.status || 'PREVIA').toUpperCase();
+    const statusB = (b.status || 'PREVIA').toUpperCase();
+    const orderA = STATUS_ORDER[statusA] !== undefined ? STATUS_ORDER[statusA] : 2;
+    const orderB = STATUS_ORDER[statusB] !== undefined ? STATUS_ORDER[statusB] : 2;
+    if (orderA !== orderB) return orderA - orderB;
+    // Within TERMINADO: show most recent first (higher id)
+    if (statusA === 'TERMINADO') return b.id - a.id;
+    // Within others: show in original order (lower id first)
+    return a.id - b.id;
   });
 }
 
@@ -791,18 +798,7 @@ function setupEventListeners() {
       const statusFilter = chip.getAttribute('data-status');
       
       STATE.activeMatchesFilter = statusFilter;
-      
-      const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
-      const sortedMatches = [...STATE.matches].sort((a, b) => {
-        const statusA = (a.status || 'PREVIA').toUpperCase();
-        const statusB = (b.status || 'PREVIA').toUpperCase();
-        if (statusOrder[statusA] !== statusOrder[statusB]) {
-          return statusOrder[statusA] - statusOrder[statusB];
-        }
-        if (statusA === 'TERMINADO') return b.id - a.id;
-        return a.id - b.id;
-      });
-      renderMatches(sortedMatches, statusFilter);
+      renderMatches(sortMatchesByStatus(STATE.matches), statusFilter);
     });
   });
 
@@ -939,33 +935,13 @@ function setupEventListeners() {
       DOM.clearMatchSearch.classList.remove('show');
     }
     
-    const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
-    const sortedMatches = [...STATE.matches].sort((a, b) => {
-      const statusA = (a.status || 'PREVIA').toUpperCase();
-      const statusB = (b.status || 'PREVIA').toUpperCase();
-      if (statusOrder[statusA] !== statusOrder[statusB]) {
-        return statusOrder[statusA] - statusOrder[statusB];
-      }
-      if (statusA === 'TERMINADO') return b.id - a.id;
-      return a.id - b.id;
-    });
-    renderMatches(sortedMatches, STATE.activeMatchesFilter);
+    renderMatches(sortMatchesByStatus(STATE.matches), STATE.activeMatchesFilter);
   });
   
   DOM.clearMatchSearch.addEventListener('click', () => {
     DOM.matchSearchInput.value = '';
     DOM.clearMatchSearch.classList.remove('show');
-    const statusOrder = { 'EN VIVO': 0, 'PREVIA': 1, 'TERMINADO': 2 };
-    const sortedMatches = [...STATE.matches].sort((a, b) => {
-      const statusA = (a.status || 'PREVIA').toUpperCase();
-      const statusB = (b.status || 'PREVIA').toUpperCase();
-      if (statusOrder[statusA] !== statusOrder[statusB]) {
-        return statusOrder[statusA] - statusOrder[statusB];
-      }
-      if (statusA === 'TERMINADO') return b.id - a.id;
-      return a.id - b.id;
-    });
-    renderMatches(sortedMatches, STATE.activeMatchesFilter);
+    renderMatches(sortMatchesByStatus(STATE.matches), STATE.activeMatchesFilter);
   });
   
   // Pull-to-refresh swipe gesture
