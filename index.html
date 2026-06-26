@@ -128,11 +128,22 @@
       <div id="view-partidos" class="view-panel hidden">
         <section class="search-section" style="margin-bottom: 10px;">
           <div class="search-bar">
-            <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="match-search-input" placeholder="Buscar etapa, grupo o país...">
-            <button id="clear-match-search" class="clear-search-btn">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
+            <i class="fa-solid fa-filter search-icon"></i>
+            <select id="match-phase-filter" style="flex: 1; background: transparent; border: none; color: var(--text-primary); font-family: inherit; font-size: 15px; padding: 8px 0; outline: none; cursor: pointer; -webkit-appearance: none; -moz-appearance: none; appearance: none;">
+              <option value="ALL" style="background: var(--card-bg); color: var(--text-primary);">Todas las Fases</option>
+              <option value="GRUPO" style="background: var(--card-bg); color: var(--text-primary);">Fase de Grupos</option>
+              <option value="16VOS" style="background: var(--card-bg); color: var(--text-primary);">Dieciseisavos de Final</option>
+              <option value="8VOS" style="background: var(--card-bg); color: var(--text-primary);">Octavos de Final</option>
+              <option value="4TOS" style="background: var(--card-bg); color: var(--text-primary);">Cuartos de Final</option>
+              <option value="SEMIS" style="background: var(--card-bg); color: var(--text-primary);">Semifinal</option>
+              <option value="3ER" style="background: var(--card-bg); color: var(--text-primary);">Tercer Puesto</option>
+              <option value="FINAL" style="background: var(--card-bg); color: var(--text-primary);">Final</option>
+            </select>
+            <i class="fa-solid fa-chevron-down" style="color: var(--text-secondary); font-size: 12px; pointer-events: none; margin-left: auto;"></i>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 4px; font-size: 13px; color: var(--text-secondary);">
+            <input type="checkbox" id="sort-by-date" style="accent-color: var(--accent-gold); cursor: pointer; width: 16px; height: 16px;">
+            <label for="sort-by-date" style="cursor: pointer; user-select: none;">Ordenar por fecha (jugados al final)</label>
           </div>
         </section>
         <section class="search-section" style="margin-bottom: 0px; padding-bottom: 0px;">

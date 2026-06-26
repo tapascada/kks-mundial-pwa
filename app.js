@@ -42,8 +42,8 @@ const DOM = {
   get clearSearch() { return document.getElementById('clear-search'); },
   get participantSearchInput() { return document.getElementById('participant-search-input'); },
   get clearParticipantSearch() { return document.getElementById('clear-participant-search'); },
-  get matchSearchInput() { return document.getElementById('match-search-input'); },
-  get clearMatchSearch() { return document.getElementById('clear-match-search'); },
+  get matchPhaseFilter() { return document.getElementById('match-phase-filter'); },
+  get sortByDate() { return document.getElementById('sort-by-date'); },
   get countPlayed() { return document.getElementById('count-played'); },
   get countLive() { return document.getElementById('count-live'); },
   get countPrevia() { return document.getElementById('count-previa'); },
@@ -266,7 +266,9 @@ async function loadExcelDatabase(arrayBuffer) {
       team2: String(r['Equipo Visitante'] || '').trim(),
       realGoals1: r['Goles Local'] === "" || r['Goles Local'] === undefined ? null : parseInt(r['Goles Local']),
       realGoals2: r['Goles Visitante'] === "" || r['Goles Visitante'] === undefined ? null : parseInt(r['Goles Visitante']),
-      status: String(r['Estado'] || ( (r['Goles Local'] !== "" && r['Goles Local'] !== undefined && r['Goles Visitante'] !== "" && r['Goles Visitante'] !== undefined) ? 'TERMINADO' : 'PREVIA' )).trim().toUpperCase()
+      status: String(r['Estado'] || ( (r['Goles Local'] !== "" && r['Goles Local'] !== undefined && r['Goles Visitante'] !== "" && r['Goles Visitante'] !== undefined) ? 'TERMINADO' : 'PREVIA' )).trim().toUpperCase(),
+      penaltiesWinner: String(r['Ganador Penaltis'] || '').trim(),
+      date: r['Fecha'] ? String(r['Fecha']).trim() : ''
     })).filter(m => m.id > 0);
 
     // 3. Parse Pronosticos
@@ -277,7 +279,8 @@ async function loadExcelDatabase(arrayBuffer) {
       matchId: parseInt(r['ID Partido'] || 0),
       predGoals1: r['Pred Local'] === "" || r['Pred Local'] === undefined ? null : parseInt(r['Pred Local']),
       predGoals2: r['Pred Visitante'] === "" || r['Pred Visitante'] === undefined ? null : parseInt(r['Pred Visitante']),
-      points: parseInt(r['Puntos'] || 0)
+      points: parseInt(r['Puntos'] || 0),
+      penaltiesWinner: String(r['Ganador Penaltis'] || '').trim()
     })).filter(pr => pr.participantName !== '' && pr.matchId > 0);
 
     STATE.positions = positions;
@@ -323,7 +326,7 @@ function renderUI() {
   renderList(standingsWithRank, DOM.searchInput.value);
 
   // Matches sorted: EN VIVO → PREVIA → PENDIENTE → TERMINADO
-  const sortedMatches = sortMatchesByStatus(STATE.matches);
+  const sortedMatches = sortMatches(STATE.matches);
   renderMatches(sortedMatches, STATE.activeMatchesFilter || 'ALL');
 
   renderParticipantsList(standingsWithRank, DOM.participantSearchInput.value);
@@ -408,6 +411,49 @@ function renderList(standings, filterText = '') {
   });
 }
 
+// --- Helper to parse match dates as Colombia Time (UTC-5) by default ---
+function parseMatchDate(dateStr) {
+  if (!dateStr) return null;
+  let str = String(dateStr).trim();
+  
+  // 1. Check Excel serial number
+  if (!isNaN(str) && str.length > 0) {
+    const serial = parseFloat(str);
+    if (serial > 30000 && serial < 60000) {
+      const ms = Math.round((serial - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const hours = String(d.getUTCHours()).padStart(2, '0');
+      const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+      const seconds = String(d.getUTCSeconds()).padStart(2, '0');
+      
+      const isoStr = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}-05:00`;
+      return new Date(isoStr);
+    }
+  }
+
+  // 2. Check if it's a date-time string in format YYYY-MM-DD or YYYY-MM-DD HH:mm:ss
+  const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+  if (isoRegex.test(str)) {
+    if (str.endsWith('Z')) {
+      str = str.slice(0, -1);
+    }
+    str = str.replace(' ', 'T');
+    const hasTimezone = str.includes('+') || (str.includes('T') && str.indexOf('-', str.indexOf('T')) !== -1);
+    if (!hasTimezone) {
+      str += '-05:00';
+    }
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) return d;
+  }
+
+  // 3. Fallback for any other valid date string format
+  const d = new Date(str);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // --- Sort matches by status priority: EN VIVO → PREVIA → PENDIENTE → TERMINADO ---
 function sortMatchesByStatus(matches) {
   const STATUS_ORDER = { 'EN VIVO': 0, 'PREVIA': 1, 'PENDIENTE': 2, 'TERMINADO': 3 };
@@ -422,6 +468,44 @@ function sortMatchesByStatus(matches) {
     // Within others: show in original order (lower id first)
     return a.id - b.id;
   });
+}
+
+// --- Sort matches by date (played last) or status order ---
+function sortMatches(matches) {
+  const sortByDateChecked = DOM.sortByDate && DOM.sortByDate.checked;
+  if (sortByDateChecked) {
+    return [...matches].sort((a, b) => {
+      const statusA = (a.status || 'PREVIA').toUpperCase();
+      const statusB = (b.status || 'PREVIA').toUpperCase();
+      const isPlayedA = statusA === 'TERMINADO';
+      const isPlayedB = statusB === 'TERMINADO';
+      
+      // Played matches are shown last
+      if (isPlayedA !== isPlayedB) {
+        return isPlayedA ? 1 : -1;
+      }
+      
+      // If dates are available, compare them
+      if (a.date && b.date) {
+        const dateA = parseMatchDate(a.date);
+        const dateB = parseMatchDate(b.date);
+        if (dateA && dateB) {
+          if (isPlayedA) {
+            // For played matches: show most recently played first (descending)
+            return dateB.getTime() - dateA.getTime();
+          } else {
+            // For upcoming/live matches: show soonest first (ascending)
+            return dateA.getTime() - dateB.getTime();
+          }
+        }
+      }
+      
+      // Fallback to ID
+      return a.id - b.id;
+    });
+  } else {
+    return sortMatchesByStatus(matches);
+  }
 }
 
 // --- Render Matches Tab ---
@@ -439,9 +523,9 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
   if (DOM.countPrevia) DOM.countPrevia.innerText = previaCount;
   if (DOM.countPending) DOM.countPending.innerText = pendingCount;
   
-  const searchVal = DOM.matchSearchInput ? DOM.matchSearchInput.value.toLowerCase().trim() : '';
+  const selectedPhase = DOM.matchPhaseFilter ? DOM.matchPhaseFilter.value : 'ALL';
   
-  // Filter matches by selected status and search query
+  // Filter matches by selected status and phase
   const filtered = matches.filter(m => {
     if (activeStatusFilter !== 'ALL') {
       if ((m.status || 'PREVIA').toUpperCase() !== activeStatusFilter.toUpperCase()) {
@@ -449,12 +533,22 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
       }
     }
     
-    if (searchVal) {
+    if (selectedPhase !== 'ALL') {
       const stage = (m.groupStage || '').toLowerCase();
-      const t1 = (m.team1 || '').toLowerCase();
-      const t2 = (m.team2 || '').toLowerCase();
-      if (!stage.includes(searchVal) && !t1.includes(searchVal) && !t2.includes(searchVal)) {
-        return false;
+      if (selectedPhase === 'GRUPO') {
+        if (!stage.startsWith('grupo')) return false;
+      } else if (selectedPhase === '16VOS') {
+        if (!stage.startsWith('16') && !stage.includes('dieciseisavos')) return false;
+      } else if (selectedPhase === '8VOS') {
+        if (!stage.startsWith('8') && !stage.includes('octavos')) return false;
+      } else if (selectedPhase === '4TOS') {
+        if (!stage.startsWith('4') && !stage.includes('cuartos')) return false;
+      } else if (selectedPhase === 'SEMIS') {
+        if (!stage.startsWith('semi') && !stage.includes('semifinal')) return false;
+      } else if (selectedPhase === '3ER') {
+        if (!stage.includes('tercer') && !stage.includes('3º') && !stage.includes('3er')) return false;
+      } else if (selectedPhase === 'FINAL') {
+        if (!stage.includes('final') || stage.includes('dieciseisavos') || stage.includes('octavos') || stage.includes('cuartos') || stage.includes('semifinal')) return false;
       }
     }
     
@@ -481,23 +575,70 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
     const finalScoreText = (isCompleted || (isLive && (match.realGoals1 !== null || match.realGoals2 !== null))) 
       ? `${match.realGoals1 ?? 0} - ${match.realGoals2 ?? 0}` 
       : 'vs';
+      
+    let isLocalWinner = false;
+    let isVisitWinner = false;
+    let winnerInfoEl = '';
+
+    if (isCompleted) {
+      let realWinner = "";
+      let method = (match.realGoals1 === match.realGoals2) ? 'Penales' : 'Tiempo Reg.';
+      
+      if (match.realGoals1 > match.realGoals2) {
+        isLocalWinner = true;
+        realWinner = match.team1;
+      } else if (match.realGoals2 > match.realGoals1) {
+        isVisitWinner = true;
+        realWinner = match.team2;
+      } else if (match.realGoals1 === match.realGoals2 && match.penaltiesWinner) {
+        realWinner = match.penaltiesWinner;
+        if (match.penaltiesWinner === match.team1) isLocalWinner = true;
+        else if (match.penaltiesWinner === match.team2) isVisitWinner = true;
+      }
+      
+      if (realWinner) {
+        winnerInfoEl = `
+          <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--accent-gold); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
+            🏆 Ganador: ${realWinner} (${method})
+          </div>
+        `;
+      } else {
+        winnerInfoEl = `
+          <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
+            🤝 Empate (Fase de Grupos)
+          </div>
+        `;
+      }
+    }
+
+    let dateStr = '';
+    if (match.date) {
+      const d = parseMatchDate(match.date);
+      if (d) {
+        const options = { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' };
+        dateStr = d.toLocaleString('es-ES', options);
+      } else {
+        dateStr = match.date;
+      }
+    }
     
     cardEl.innerHTML = `
       <div class="match-card-header" style="display: flex; justify-content: space-between; align-items: center;">
-        <span>${match.groupStage}</span>
+        <span>${match.groupStage} ${dateStr ? `• ${dateStr}` : ''}</span>
         <span class="match-status-badge status-${(match.status || 'PREVIA').toLowerCase().replace(' ', '-')}">${match.status || 'PREVIA'}</span>
       </div>
       <div class="match-card-teams">
         <div class="team-info team-local-info">
-          <span class="match-team team-local">${match.team1}</span>
+          <span class="match-team team-local" style="${isLocalWinner ? 'font-weight: bold; color: var(--accent-gold);' : ''}">${match.team1} ${isLocalWinner ? '🏆' : ''}</span>
           <img src="${getFlagUrl(match.team1)}" class="match-flag flag-local" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
         </div>
         <span class="match-score-pill ${isLive ? 'score-live' : ''}">${finalScoreText}</span>
         <div class="team-info team-visit-info">
           <img src="${getFlagUrl(match.team2)}" class="match-flag flag-visit" onerror="this.src='Assets/Flags/placeholder.png'" alt="">
-          <span class="match-team team-visit">${match.team2}</span>
+          <span class="match-team team-visit" style="${isVisitWinner ? 'font-weight: bold; color: var(--accent-gold);' : ''}">${isVisitWinner ? '🏆' : ''} ${match.team2}</span>
         </div>
       </div>
+      ${winnerInfoEl}
       <button class="match-toggle-btn" data-match-id="${match.id}">
         <i class="fa-solid fa-chevron-down"></i> Ver Pronósticos
       </button>
@@ -577,11 +718,27 @@ function loadMatchPredictions(matchId) {
     }
     
     let badgeClass = 'zero';
-    if (p.points === 5) badgeClass = 'exact';
-    else if (p.points === 3) badgeClass = 'diff';
+    if (p.points >= 5) badgeClass = 'exact';
+    else if (p.points === 3 || p.points === 4) badgeClass = 'diff';
     else if (p.points === 2) badgeClass = 'outcome';
     
-    const predText = (p.predGoals1 !== null && p.predGoals2 !== null) ? `${p.predGoals1} - ${p.predGoals2}` : "-";
+    let predText = (p.predGoals1 !== null && p.predGoals2 !== null) ? `${p.predGoals1} - ${p.predGoals2}` : "-";
+    if (p.predGoals1 !== null && p.predGoals2 !== null) {
+      const match = STATE.matches.find(m => m.id === p.matchId);
+      if (match) {
+        let predWinner = "";
+        if (p.predGoals1 > p.predGoals2) {
+          predWinner = match.team1;
+        } else if (p.predGoals2 > p.predGoals1) {
+          predWinner = match.team2;
+        } else if (p.predGoals1 === p.predGoals2 && p.penaltiesWinner) {
+          predWinner = p.penaltiesWinner;
+        }
+        if (predWinner) {
+          predText += ` (${predWinner})`;
+        }
+      }
+    }
     
     return `
       <tr>
@@ -697,8 +854,23 @@ function openParticipantDetailModal(participantName) {
       const itemEl = document.createElement('div');
       itemEl.className = 'history-pred-card';
       
-      const realText = (match.realGoals1 !== null && match.realGoals2 !== null) ? `${match.realGoals1} - ${match.realGoals2}` : "Pendiente";
-      const predText = (p.predGoals1 !== null && p.predGoals2 !== null) ? `${p.predGoals1} - ${p.predGoals2}` : "-";
+      let realText = (match.realGoals1 !== null && match.realGoals2 !== null) ? `${match.realGoals1} - ${match.realGoals2}` : "Pendiente";
+      if (match.realGoals1 !== null && match.realGoals2 !== null) {
+        let realWinner = "";
+        if (match.realGoals1 > match.realGoals2) realWinner = match.team1;
+        else if (match.realGoals2 > match.realGoals1) realWinner = match.team2;
+        else if (match.realGoals1 === match.realGoals2 && match.penaltiesWinner) realWinner = match.penaltiesWinner;
+        if (realWinner) realText += ` (${realWinner})`;
+      }
+      
+      let predText = (p.predGoals1 !== null && p.predGoals2 !== null) ? `${p.predGoals1} - ${p.predGoals2}` : "-";
+      if (p.predGoals1 !== null && p.predGoals2 !== null) {
+        let predWinner = "";
+        if (p.predGoals1 > p.predGoals2) predWinner = match.team1;
+        else if (p.predGoals2 > p.predGoals1) predWinner = match.team2;
+        else if (p.predGoals1 === p.predGoals2 && p.penaltiesWinner) predWinner = p.penaltiesWinner;
+        if (predWinner) predText += ` (${predWinner})`;
+      }
       
       let badgeClass = 'zero';
       if (p.points === 5) badgeClass = 'exact';
@@ -798,7 +970,7 @@ function setupEventListeners() {
       const statusFilter = chip.getAttribute('data-status');
       
       STATE.activeMatchesFilter = statusFilter;
-      renderMatches(sortMatchesByStatus(STATE.matches), statusFilter);
+      renderMatches(sortMatches(STATE.matches), statusFilter);
     });
   });
 
@@ -926,23 +1098,19 @@ function setupEventListeners() {
     }
   });
 
-  // Search Matches
-  DOM.matchSearchInput.addEventListener('input', (e) => {
-    const text = e.target.value;
-    if (text) {
-      DOM.clearMatchSearch.classList.add('show');
-    } else {
-      DOM.clearMatchSearch.classList.remove('show');
-    }
-    
-    renderMatches(sortMatchesByStatus(STATE.matches), STATE.activeMatchesFilter);
-  });
-  
-  DOM.clearMatchSearch.addEventListener('click', () => {
-    DOM.matchSearchInput.value = '';
-    DOM.clearMatchSearch.classList.remove('show');
-    renderMatches(sortMatchesByStatus(STATE.matches), STATE.activeMatchesFilter);
-  });
+  // Phase Filter Event
+  if (DOM.matchPhaseFilter) {
+    DOM.matchPhaseFilter.addEventListener('change', () => {
+      renderMatches(sortMatches(STATE.matches), STATE.activeMatchesFilter);
+    });
+  }
+
+  // Sort by Date Event
+  if (DOM.sortByDate) {
+    DOM.sortByDate.addEventListener('change', () => {
+      renderMatches(sortMatches(STATE.matches), STATE.activeMatchesFilter);
+    });
+  }
   
   // Pull-to-refresh swipe gesture
   let touchStart = 0;
