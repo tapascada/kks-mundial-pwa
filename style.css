@@ -1016,6 +1016,11 @@ body {
   text-align: center;
 }
 
+.pred-pts-badge.seven {
+  background: #8B5CF6;
+  color: #fff;
+}
+
 .pred-pts-badge.exact {
   background: #10B981;
   color: #fff;

@@ -725,7 +725,8 @@ function loadMatchPredictions(matchId) {
     }
     
     let badgeClass = 'zero';
-    if (p.points >= 5) badgeClass = 'exact';
+    if (p.points === 7) badgeClass = 'seven';
+    else if (p.points === 5) badgeClass = 'exact';
     else if (p.points === 3 || p.points === 4) badgeClass = 'diff';
     else if (p.points === 2) badgeClass = 'outcome';
     
@@ -880,8 +881,9 @@ function openParticipantDetailModal(participantName) {
       }
       
       let badgeClass = 'zero';
-      if (p.points === 5) badgeClass = 'exact';
-      else if (p.points === 3) badgeClass = 'diff';
+      if (p.points === 7) badgeClass = 'seven';
+      else if (p.points === 5) badgeClass = 'exact';
+      else if (p.points === 3 || p.points === 4) badgeClass = 'diff';
       else if (p.points === 2) badgeClass = 'outcome';
       
       itemEl.innerHTML = `
