@@ -44,6 +44,7 @@ const DOM = {
   get clearParticipantSearch() { return document.getElementById('clear-participant-search'); },
   get matchPhaseFilter() { return document.getElementById('match-phase-filter'); },
   get sortByDate() { return document.getElementById('sort-by-date'); },
+  get excludeGroups() { return document.getElementById('exclude-groups'); },
   get countPlayed() { return document.getElementById('count-played'); },
   get countLive() { return document.getElementById('count-live'); },
   get countPrevia() { return document.getElementById('count-previa'); },
@@ -524,6 +525,7 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
   if (DOM.countPending) DOM.countPending.innerText = pendingCount;
   
   const selectedPhase = DOM.matchPhaseFilter ? DOM.matchPhaseFilter.value : 'ALL';
+  const excludeGroupsChecked = DOM.excludeGroups && DOM.excludeGroups.checked;
   
   // Filter matches by selected status and phase
   const filtered = matches.filter(m => {
@@ -533,8 +535,13 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
       }
     }
     
+    const stage = (m.groupStage || '').toLowerCase();
+    
+    if (excludeGroupsChecked && stage.startsWith('grupo')) {
+      return false;
+    }
+    
     if (selectedPhase !== 'ALL') {
-      const stage = (m.groupStage || '').toLowerCase();
       if (selectedPhase === 'GRUPO') {
         if (!stage.startsWith('grupo')) return false;
       } else if (selectedPhase === '16VOS') {
@@ -1108,6 +1115,13 @@ function setupEventListeners() {
   // Sort by Date Event
   if (DOM.sortByDate) {
     DOM.sortByDate.addEventListener('change', () => {
+      renderMatches(sortMatches(STATE.matches), STATE.activeMatchesFilter);
+    });
+  }
+  
+  // Exclude Groups Event
+  if (DOM.excludeGroups) {
+    DOM.excludeGroups.addEventListener('change', () => {
       renderMatches(sortMatches(STATE.matches), STATE.activeMatchesFilter);
     });
   }

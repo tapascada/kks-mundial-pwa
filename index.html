@@ -141,9 +141,15 @@
             </select>
             <i class="fa-solid fa-chevron-down" style="color: var(--text-secondary); font-size: 12px; pointer-events: none; margin-left: auto;"></i>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 0 4px; font-size: 13px; color: var(--text-secondary);">
-            <input type="checkbox" id="sort-by-date" style="accent-color: var(--accent-gold); cursor: pointer; width: 16px; height: 16px;">
-            <label for="sort-by-date" style="cursor: pointer; user-select: none;">Ordenar por fecha (jugados al final)</label>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 8px; padding: 0 4px; font-size: 13px; color: var(--text-secondary);">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="sort-by-date" style="accent-color: var(--accent-gold); cursor: pointer; width: 16px; height: 16px;">
+              <label for="sort-by-date" style="cursor: pointer; user-select: none;">Ordenar por fecha (jugados al final)</label>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <input type="checkbox" id="exclude-groups" style="accent-color: var(--accent-gold); cursor: pointer; width: 16px; height: 16px;">
+              <label for="exclude-groups" style="cursor: pointer; user-select: none;">Excluir f. grupos</label>
+            </div>
           </div>
         </section>
         <section class="search-section" style="margin-bottom: 0px; padding-bottom: 0px;">
