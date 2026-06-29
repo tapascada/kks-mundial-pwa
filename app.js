@@ -617,13 +617,14 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
           if (realWinner) {
             winnerInfoEl = `
               <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--accent-gold); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
-                🤝 Empate (${realWinner})
+                Ganador Penales: '${realWinner}'
               </div>
             `;
           } else {
+            const drawIcon = (isLive && !match.groupStage.startsWith('Grupo')) ? '🤜🤛' : '🤝';
             winnerInfoEl = `
               <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
-                🤝 Empate
+                ${drawIcon} Empate
               </div>
             `;
           }
