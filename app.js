@@ -617,7 +617,7 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
           if (realWinner) {
             winnerInfoEl = `
               <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--accent-gold); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
-                Ganador Penales: '${realWinner}'
+                🏆 Ganador Penales: '${realWinner}'
               </div>
             `;
           } else {
