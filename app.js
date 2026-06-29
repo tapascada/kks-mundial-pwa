@@ -435,6 +435,9 @@ function parseMatchDate(dateStr) {
     }
   }
 
+  // Remove parentheticals (e.g. " (hora estándar de Colombia)") to prevent invalid date parsing on some browsers/locales
+  str = str.replace(/\s*\([^)]*\)\s*/g, '').trim();
+
   // 2. Check if it's a date-time string in format YYYY-MM-DD or YYYY-MM-DD HH:mm:ss
   const isoRegex = /^\d{4}-\d{2}-\d{2}/;
   if (isoRegex.test(str)) {
