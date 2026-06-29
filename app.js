@@ -606,16 +606,32 @@ function renderMatches(matches, activeStatusFilter = 'ALL') {
         else if (match.penaltiesWinner === match.team2) isVisitWinner = true;
       }
       
-      if (realWinner) {
+      if (match.realGoals1 === match.realGoals2) {
+        if (match.groupStage.startsWith('Grupo')) {
+          winnerInfoEl = `
+            <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
+              🤝 Empate (Fase de Grupos)
+            </div>
+          `;
+        } else {
+          if (realWinner) {
+            winnerInfoEl = `
+              <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--accent-gold); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
+                🤝 Empate (${realWinner})
+              </div>
+            `;
+          } else {
+            winnerInfoEl = `
+              <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
+                🤝 Empate
+              </div>
+            `;
+          }
+        }
+      } else {
         winnerInfoEl = `
           <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--accent-gold); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
             🏆 Ganador: ${realWinner} (${method})
-          </div>
-        `;
-      } else {
-        winnerInfoEl = `
-          <div class="match-winner-info" style="text-align: center; font-size: 12px; color: var(--text-secondary); font-weight: bold; margin-top: -6px; margin-bottom: 8px;">
-            🤝 Empate (Fase de Grupos)
           </div>
         `;
       }
