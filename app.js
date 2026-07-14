@@ -40,6 +40,7 @@ const DOM = {
   // Search inputs & status
   get searchInput() { return document.getElementById('search-input'); },
   get clearSearch() { return document.getElementById('clear-search'); },
+  get toggleComodines() { return document.getElementById('toggle-comodines'); },
   get participantSearchInput() { return document.getElementById('participant-search-input'); },
   get clearParticipantSearch() { return document.getElementById('clear-participant-search'); },
   get matchPhaseFilter() { return document.getElementById('match-phase-filter'); },
@@ -104,6 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Settings Management & Loading ---
 function loadSettings() {
   STATE.driveId = DEFAULT_DRIVE_ID;
+  
+  // Load comodines toggle preference
+  const storedComodines = localStorage.getItem('kikes_toggle_comodines');
+  if (storedComodines !== null && DOM.toggleComodines) {
+    DOM.toggleComodines.checked = storedComodines === 'true';
+  }
   
   const cachedPos = localStorage.getItem('kikes_cached_positions');
   const cachedMatches = localStorage.getItem('kikes_cached_matches');
@@ -302,16 +309,20 @@ async function loadExcelDatabase(arrayBuffer) {
   }
 }
 
-// --- UI Rendering ---
-function renderUI() {
-  if (!STATE.positions || STATE.positions.length === 0) return;
+// --- Dynamic Standings & Rankings Calculation ---
+function getStandingsWithRank() {
+  if (!STATE.positions || STATE.positions.length === 0) return [];
   
-  // Sort positions descending by totalPoints, then name ascending
-  const sortedPositions = [...STATE.positions].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
+  const includeComodines = DOM.toggleComodines ? DOM.toggleComodines.checked : true;
+  const getPoints = (s) => includeComodines ? s.totalPoints : s.matchPoints;
+  
+  // Sort positions descending by active points, then name ascending
+  const sortedPositions = [...STATE.positions].sort((a, b) => getPoints(b) - getPoints(a) || a.name.localeCompare(b.name));
   
   let currentRank = 1;
-  const standingsWithRank = sortedPositions.map((s, index) => {
-    if (index > 0 && s.totalPoints < sortedPositions[index - 1].totalPoints) {
+  return sortedPositions.map((s, index) => {
+    const activePoints = getPoints(s);
+    if (index > 0 && getPoints(sortedPositions[index - 1]) > activePoints) {
       currentRank = index + 1;
     }
     return {
@@ -319,9 +330,16 @@ function renderUI() {
       name: s.name,
       matchPoints: s.matchPoints,
       wildcardPoints: s.wildcardPoints,
-      totalPoints: s.totalPoints
+      totalPoints: activePoints
     };
   });
+}
+
+// --- UI Rendering ---
+function renderUI() {
+  if (!STATE.positions || STATE.positions.length === 0) return;
+  
+  const standingsWithRank = getStandingsWithRank();
 
   renderPodium(standingsWithRank);
   renderList(standingsWithRank, DOM.searchInput.value);
@@ -1027,6 +1045,14 @@ function setupEventListeners() {
     }
   });
   
+  // Toggle Comodines Event
+  if (DOM.toggleComodines) {
+    DOM.toggleComodines.addEventListener('change', () => {
+      localStorage.setItem('kikes_toggle_comodines', DOM.toggleComodines.checked);
+      renderUI();
+    });
+  }
+
   // Search Positions
   DOM.searchInput.addEventListener('input', (e) => {
     const text = e.target.value;
@@ -1037,20 +1063,7 @@ function setupEventListeners() {
     }
     
     if (STATE.positions && STATE.positions.length > 0) {
-      const sortedPositions = [...STATE.positions].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
-      let currentRank = 1;
-      const standingsWithRank = sortedPositions.map((s, index) => {
-        if (index > 0 && s.totalPoints < sortedPositions[index - 1].totalPoints) {
-          currentRank = index + 1;
-        }
-        return {
-          rank: currentRank,
-          name: s.name,
-          matchPoints: s.matchPoints,
-          wildcardPoints: s.wildcardPoints,
-          totalPoints: s.totalPoints
-        };
-      });
+      const standingsWithRank = getStandingsWithRank();
       renderList(standingsWithRank, text);
     }
   });
@@ -1059,20 +1072,7 @@ function setupEventListeners() {
     DOM.searchInput.value = '';
     DOM.clearSearch.classList.remove('show');
     if (STATE.positions && STATE.positions.length > 0) {
-      const sortedPositions = [...STATE.positions].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
-      let currentRank = 1;
-      const standingsWithRank = sortedPositions.map((s, index) => {
-        if (index > 0 && s.totalPoints < sortedPositions[index - 1].totalPoints) {
-          currentRank = index + 1;
-        }
-        return {
-          rank: currentRank,
-          name: s.name,
-          matchPoints: s.matchPoints,
-          wildcardPoints: s.wildcardPoints,
-          totalPoints: s.totalPoints
-        };
-      });
+      const standingsWithRank = getStandingsWithRank();
       renderList(standingsWithRank, '');
     }
   });
@@ -1087,20 +1087,7 @@ function setupEventListeners() {
     }
     
     if (STATE.positions && STATE.positions.length > 0) {
-      const sortedPositions = [...STATE.positions].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
-      let currentRank = 1;
-      const standingsWithRank = sortedPositions.map((s, index) => {
-        if (index > 0 && s.totalPoints < sortedPositions[index - 1].totalPoints) {
-          currentRank = index + 1;
-        }
-        return {
-          rank: currentRank,
-          name: s.name,
-          matchPoints: s.matchPoints,
-          wildcardPoints: s.wildcardPoints,
-          totalPoints: s.totalPoints
-        };
-      });
+      const standingsWithRank = getStandingsWithRank();
       renderParticipantsList(standingsWithRank, text);
     }
   });
@@ -1109,20 +1096,7 @@ function setupEventListeners() {
     DOM.participantSearchInput.value = '';
     DOM.clearParticipantSearch.classList.remove('show');
     if (STATE.positions && STATE.positions.length > 0) {
-      const sortedPositions = [...STATE.positions].sort((a, b) => b.totalPoints - a.totalPoints || a.name.localeCompare(b.name));
-      let currentRank = 1;
-      const standingsWithRank = sortedPositions.map((s, index) => {
-        if (index > 0 && s.totalPoints < sortedPositions[index - 1].totalPoints) {
-          currentRank = index + 1;
-        }
-        return {
-          rank: currentRank,
-          name: s.name,
-          matchPoints: s.matchPoints,
-          wildcardPoints: s.wildcardPoints,
-          totalPoints: s.totalPoints
-        };
-      });
+      const standingsWithRank = getStandingsWithRank();
       renderParticipantsList(standingsWithRank, '');
     }
   });
