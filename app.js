@@ -828,13 +828,16 @@ function renderParticipantsList(standings, filterText = '') {
       <div class="col-rank" style="width: 55px; text-align: center;">
         <span class="rank-badge">${item.rank}</span>
       </div>
-      <div class="col-name" style="flex: 1; margin-left: 10px;">
+      <div class="col-name" style="flex: 1; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         <span class="item-name">${item.name}</span>
       </div>
-      <div class="col-details" style="width: 90px; text-align: center; font-weight: 800; color: var(--accent-gold); font-size: 15px;">
-        ${item.totalPoints} pts
+      <div class="col-details" style="width: 110px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;">
+        <span style="font-weight: 800; color: var(--accent-gold); font-size: 15px; line-height: 1.1;">${item.matchPoints + item.wildcardPoints} pts</span>
+        <span style="font-size: 10px; color: var(--text-secondary); white-space: nowrap; font-weight: 600;">
+          ⚽ ${item.matchPoints} / 🏆 ${item.wildcardPoints}
+        </span>
       </div>
-      <div class="col-total" style="width: 105px; text-align: right;">
+      <div class="col-total" style="width: 100px; text-align: right;">
         <button class="btn-detail" data-participant-name="${item.name}">
           <i class="fa-solid fa-eye"></i> Ver Pronos
         </button>
